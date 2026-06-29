@@ -1,0 +1,102 @@
+﻿{% extends "crm/base.html" %}
+{% block title %}经营看板{% endblock %}
+{% block heading %}经营看板{% endblock %}
+{% block content %}
+<section class="toolbar" style="margin-bottom:14px;">
+  <a class="button secondary" href="{{ dashboard_links.contact_logs }}">跟进日志</a>
+  <a class="metric metric-link metric-flat" href="{{ dashboard_links.contracts }}" style="display:none">合同入口</a>
+</section>
+
+<section class="grid six">
+  <a class="metric metric-link" href="{% url 'customer_list' %}"><div class="value">{{ record_count }}</div><div class="label">客户总数</div></a>
+  <a class="metric metric-link warn" href="{{ dashboard_links.today_due }}"><div class="value">{{ today_due_count }}</div><div class="label">今日应跟进</div></a>
+  <a class="metric metric-link warn" href="{{ dashboard_links.two_week_follow }}"><div class="value">{{ stale_count }}</div><div class="label">逾期未联系</div></a>
+  <a class="metric metric-link warn" href="{% url 'quote_list' %}?status=sent"><div class="value">{{ quote_followup_count }}</div><div class="label">已报价未跟进</div></a>
+  <a class="metric metric-link" href="{% url 'customer_list' %}?scope=public"><div class="value">{{ public_pool_count }}</div><div class="label">公海客户</div></a>
+  <a class="metric metric-link" href="{% url 'customer_list' %}?scope=recycled"><div class="value">{{ recycled_customer_count }}</div><div class="label">回收站客户</div></a>
+  <a class="metric metric-link warn" href="{% url 'reminder_list' %}?status=overdue"><div class="value">{{ task_overdue_count }}</div><div class="label">逾期任务</div></a>
+</section>
+
+<section class="pie-section" aria-label="客户分类占比">
+  <div class="section-title"><h2>客户分类占比</h2></div>
+  <div class="pie-grid">
+    {% for pie in dashboard_pies %}
+    <div class="pie-panel">
+      <div class="pie-heading"><h3>{{ pie.title }}</h3><span>{{ pie.total }} 项</span></div>
+      <div class="pie-layout">
+        <div class="pie-chart" style="{{ pie.style }}"><span>{{ pie.total }}</span></div>
+        <div class="pie-legend">
+          {% for row in pie.rows %}
+          <div class="pie-legend-row">
+            <span class="pie-dot" style="background: {{ row.color }}"></span>
+            <span class="pie-name" title="{{ row.label }}">{{ row.label }}</span>
+            <strong>{{ row.percent }}%</strong>
+            <span>{{ row.total }}</span>
+          </div>
+          {% empty %}
+          <div class="muted">暂无数据</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="panel muted">暂无分类占比数据。</div>
+    {% endfor %}
+  </div>
+</section>
+<section class="panel" style="margin-bottom:14px;">
+  <h2>销售人员负载</h2>
+  <table class="compact-table">
+    <thead><tr><th>业务员</th><th>意向客户</th><th>已报价未跟进</th><th>今日应跟进</th></tr></thead>
+    <tbody>
+      {% for row in owner_load_rows %}
+      <tr><td>{{ row.label }}</td><td>{{ row.intent_customers }}</td><td>{{ row.quoted_followups }}</td><td>{{ row.today_due }}</td></tr>
+      {% empty %}<tr><td colspan="4" class="muted">暂无负载数据。</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="split-grid">
+  <div class="panel">
+    <h2>负责人负载</h2>
+    <div class="table-scroll">
+      <table class="compact-table">
+        <thead><tr><th>负责人</th><th>客户数</th><th>今日应跟进</th><th>逾期未联系</th><th>重点客户</th><th>本周跟进</th></tr></thead>
+        <tbody>
+          {% for row in owner_action_rows %}
+          <tr><td>{{ row.label }}</td><td>{{ row.total }}</td><td>{{ row.due }}</td><td>{{ row.stale }}</td><td>{{ row.hot }}</td><td>{{ row.week_logs }}</td></tr>
+          {% empty %}<tr><td colspan="6" class="muted">暂无负责人负载。</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>来源质量</h2>
+    <div class="table-scroll">
+      <table class="compact-table">
+        <thead><tr><th>来源</th><th>客户数</th><th>有效率</th><th>无效/待定</th><th>重点</th><th>成交</th></tr></thead>
+        <tbody>
+          {% for row in source_quality_rows %}
+          <tr{% if forloop.counter > 10 %} class="data-source-quality-extra hidden"{% endif %}><td>{{ row.source_channel|default:"未填写" }}</td><td>{{ row.total }}</td><td>{{ row.effective_rate }}%</td><td>{{ row.invalid }}</td><td>{{ row.hot }}</td><td>{{ row.deal }}</td></tr>
+          {% empty %}<tr><td colspan="6" class="muted">暂无来源质量数据。</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if source_quality_has_more %}<button class="button secondary" type="button" style="margin-top:10px;">查看更多</button>{% endif %}
+  </div>
+</section>
+
+<section class="panel" style="margin-top:14px;">
+  <h2>报价跟进</h2>
+  <div class="table-scroll">
+    <table class="compact-table">
+      <thead><tr><th>客户</th><th>业务员</th><th>报价日期</th><th>金额</th><th>状态</th><th>下一步</th></tr></thead>
+      <tbody>
+        {% for quote in quote_followup_rows %}
+        <tr><td><a href="{% url 'customer_detail' quote.customer.pk %}">{{ quote.customer.display_name }}</a></td><td>{{ quote.quoted_by|default:quote.customer.owner_display }}</td><td>{{ quote.quote_date|date:"Y-m-d" }}</td><td>{{ quote.total_amount|floatformat:2 }} {{ quote.currency }}</td><td>{{ quote.get_status_display }}</td><td>{{ quote.customer.next_action|default:"待跟进" }}</td></tr>
+        {% empty %}<tr><td colspan="6" class="muted">暂无已报价未跟进。</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

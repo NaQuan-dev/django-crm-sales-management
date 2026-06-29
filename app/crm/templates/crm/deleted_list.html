@@ -1,0 +1,105 @@
+{% extends "crm/base.html" %}
+{% block title %}最近删除{% endblock %}
+{% block heading %}最近删除{% endblock %}
+{% block content %}
+<div class="scope-notice" style="margin-bottom:12px;">最近删除用于防止误删。当前正式版支持恢复客户信息和合同信息；跟进记录删除前会再次确认。</div>
+
+<form method="get" class="search-panel">
+  <div class="search-grid">
+    <div class="filter-field">
+      <label for="deleted-q">关键词</label>
+      <input id="deleted-q" name="q" value="{{ q }}" placeholder="搜索客户、编号、负责人、合同">
+    </div>
+    <div class="filter-field">
+      <label for="deleted-type">记录类型</label>
+      <select id="deleted-type" name="record_type">
+        <option value="">全部类型</option>
+        <option value="customer" {% if record_type == "customer" %}selected{% endif %}>客户信息</option>
+        <option value="contract" {% if record_type == "contract" %}selected{% endif %}>合同信息</option>
+      </select>
+    </div>
+    <div class="filter-field">
+      <label for="deleted-date">删除日期</label>
+      <input id="deleted-date" name="deleted_date" value="{{ deleted_date }}" type="date">
+    </div>
+    <div class="filter-field">
+      <label for="deleted-owner">原负责人</label>
+      <select id="deleted-owner" name="owner">
+        <option value="">全部负责人</option>
+        {% for item in owner_options %}
+          <option value="{{ item.value }}" {% if owner == item.value %}selected{% endif %}>{{ item.label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <div class="search-actions">
+    <a class="button secondary" href="{% url 'deleted_list' %}">清空</a>
+    <button type="submit">查询</button>
+  </div>
+</form>
+
+<div class="table-scroll">
+  <table class="record-table compact-table">
+    <thead>
+      <tr>
+        <th>类型</th>
+        <th>编号</th>
+        <th>名称</th>
+        <th>原负责人</th>
+        <th>删除时间</th>
+        <th>说明</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for customer in customers %}
+      <tr data-row-selectable>
+        <td><span class="tag tag-info">客户信息</span></td>
+        <td class="nowrap">{{ customer.customer_no }}</td>
+        <td class="clip">{{ customer }}</td>
+        <td class="nowrap">{{ customer.owner_display|default:"未分配" }}</td>
+        <td class="nowrap">{{ customer.updated_at|date:"Y-m-d H:i" }}</td>
+        <td class="clip">{{ customer.phone|default:customer.wechat|default:"" }}</td>
+        <td>
+          <form method="post" action="{% url 'customer_restore' customer.pk %}" onsubmit="return confirm('确认恢复客户「{{ customer }}」？');">
+            {% csrf_token %}
+            <button type="submit">恢复</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      {% for contract in contracts %}
+      <tr data-row-selectable>
+        <td><span class="tag tag-normal">合同信息</span></td>
+        <td class="nowrap">{{ contract.contract_no }}</td>
+        <td class="clip">{{ contract.customer|default:contract.customer_name }}</td>
+        <td class="nowrap">{{ contract.signed_by|default:contract.signed_by_name }}</td>
+        <td class="nowrap">{{ contract.updated_at|date:"Y-m-d H:i" }}</td>
+        <td class="clip">金额 {{ contract.amount|floatformat:2 }}</td>
+        <td>
+          <form method="post" action="{% url 'contract_restore' contract.pk %}" onsubmit="return confirm('确认恢复合同「{{ contract.contract_no }}」？');">
+            {% csrf_token %}
+            <button type="submit">恢复</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      {% if not customers and not contracts %}
+      <tr><td colspan="7" class="muted">最近删除为空。</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+  document.querySelectorAll("[data-row-selectable]").forEach(function (row) {
+    row.addEventListener("click", function (event) {
+      if (event.target.closest("a, button, form")) return;
+      document.querySelectorAll("[data-row-selectable]").forEach(function (item) {
+        item.classList.remove("selected-row");
+      });
+      row.classList.add("selected-row");
+    });
+  });
+</script>
+{% endblock %}

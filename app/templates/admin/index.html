@@ -1,0 +1,143 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static admin_dashboard %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static "admin/css/dashboard.css" %}">
+<style>
+  body.dashboard #content { max-width: 1280px; }
+  .nq-admin-hero {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    align-items: flex-start;
+    padding: 18px;
+    margin-bottom: 16px;
+    border: 1px solid #d8e0e8;
+    border-radius: 8px;
+    background: #fff;
+  }
+  .nq-admin-hero h1 { margin: 0 0 6px; font-size: 24px; color: #17212b; }
+  .nq-admin-hero p { margin: 0; color: #5e6b7a; line-height: 1.6; }
+  .nq-admin-hero-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .nq-admin-button {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 0 13px;
+    border-radius: 6px;
+    border: 1px solid #d8e0e8;
+    background: #fff;
+    color: #115e59 !important;
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .nq-admin-button.primary { background: #0f766e; border-color: #0f766e; color: #fff !important; }
+  .nq-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .nq-metric {
+    padding: 14px;
+    border: 1px solid #d8e0e8;
+    border-radius: 8px;
+    background: #fff;
+  }
+  .nq-metric span { display: block; color: #5e6b7a; font-size: 12px; margin-bottom: 7px; }
+  .nq-metric strong { display: block; color: #17212b; font-size: 24px; line-height: 1.1; }
+  .nq-metric small { display: block; color: #5e6b7a; margin-top: 7px; line-height: 1.4; }
+  .nq-admin-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(320px, .9fr); gap: 16px; align-items: start; }
+  .nq-panel { border: 1px solid #d8e0e8; border-radius: 8px; background: #fff; overflow: hidden; margin-bottom: 16px; }
+  .nq-panel-header { padding: 13px 15px; border-bottom: 1px solid #d8e0e8; background: #f5f7fa; }
+  .nq-panel-header h2 { margin: 0; font-size: 15px; color: #17212b; background: transparent; padding: 0; }
+  .nq-panel-body { padding: 14px 15px; }
+  .nq-link-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .nq-action-link { display: block; padding: 12px; border: 1px solid #d8e0e8; border-radius: 8px; background: #fff; text-decoration: none; }
+  .nq-action-link strong { display: block; color: #17212b; margin-bottom: 5px; }
+  .nq-action-link span { display: block; color: #5e6b7a; font-size: 12px; line-height: 1.5; }
+  .nq-health-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+  .nq-health-list li { display: flex; justify-content: space-between; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid #eef2f6; color: #17212b; }
+  .nq-health-list li:last-child { border-bottom: 0; padding-bottom: 0; }
+  .nq-health-list span { color: #5e6b7a; }
+  .nq-admin-models .app-crm table, .nq-admin-models .app-auth table { width: 100%; }
+  .nq-admin-models .module { border: 1px solid #d8e0e8; border-radius: 8px; overflow: hidden; background: #fff; }
+  .nq-admin-models .module caption { background: #f5f7fa; color: #17212b; font-weight: 700; }
+  #content-related { display: none; }
+  @media (max-width: 980px) {
+    .nq-metrics, .nq-admin-grid, .nq-link-grid { grid-template-columns: 1fr; }
+    .nq-admin-hero { display: block; }
+    .nq-admin-hero-actions { justify-content: flex-start; margin-top: 12px; }
+  }
+</style>
+{% endblock %}
+
+{% block coltype %}colM{% endblock %}
+{% block bodyclass %}{{ block.super }} dashboard{% endblock %}
+{% block nav-breadcrumbs %}{% endblock %}
+{% block nav-sidebar %}{% endblock %}
+
+{% block content %}
+{% admin_dashboard_metrics as metrics %}
+<div class="nq-admin-hero">
+  <div>
+    <h1>系统管理工作台</h1>
+    <p>用于管理客户基础资料、权限账号、飞书同步配置和审计记录。日常客户跟进请回到客户系统前台操作。</p>
+  </div>
+  <div class="nq-admin-hero-actions">
+    <a class="nq-admin-button primary" href="{% url 'dashboard' %}">返回客户系统首页</a>
+    <a class="nq-admin-button" href="{% url 'customer_list' %}">打开客户总表</a>
+    <a class="nq-admin-button" href="{% url 'admin:auth_user_changelist' %}">管理账号权限</a>
+  </div>
+</div>
+
+<div class="nq-metrics">
+  <div class="nq-metric"><span>有效客户资料</span><strong>{{ metrics.customers }}</strong><small>公海 {{ metrics.public_customers }} 条，未分配 {{ metrics.unassigned_customers }} 条</small></div>
+  <div class="nq-metric"><span>今日待跟进</span><strong>{{ metrics.due_today }}</strong><small>逾期或今日应联系的客户</small></div>
+  <div class="nq-metric"><span>合同金额</span><strong>{{ metrics.contract_amount }}</strong><small>合同 {{ metrics.contracts }} 份</small></div>
+  <div class="nq-metric"><span>飞书同步源</span><strong>{{ metrics.enabled_sources }}</strong><small>同步记录 {{ metrics.sync_records }} 条</small></div>
+</div>
+
+<div class="nq-admin-grid">
+  <div>
+    <section class="nq-panel">
+      <div class="nq-panel-header"><h2>常用管理入口</h2></div>
+      <div class="nq-panel-body nq-link-grid">
+        <a class="nq-action-link" href="{% url 'admin:crm_customer_changelist' %}"><strong>客户资料维护</strong><span>查找客户、修正基础字段、核对负责人和公海状态</span></a>
+        <a class="nq-action-link" href="{% url 'admin:crm_contactlog_changelist' %}"><strong>跟进日志审查</strong><span>核对拜访、电话、微信、邮件等跟进内容</span></a>
+        <a class="nq-action-link" href="{% url 'admin:crm_contract_changelist' %}"><strong>合同数据管理</strong><span>维护合同编号、签约人、金额和客户关联</span></a>
+        <a class="nq-action-link" href="{% url 'admin:crm_feishusyncsource_changelist' %}"><strong>飞书同步配置</strong><span>启停同步源、检查表格令牌和记录类型</span></a>
+        <a class="nq-action-link" href="{% url 'admin:crm_profile_changelist' %}"><strong>员工权限角色</strong><span>设置管理员、主管、销售等客户系统访问权限</span></a>
+        <a class="nq-action-link" href="{% url 'admin:crm_auditlog_changelist' %}"><strong>操作审计日志</strong><span>查看关键改动记录，辅助追踪资料安全</span></a>
+      </div>
+    </section>
+
+    <section class="nq-admin-models">
+      {% include "admin/app_list.html" with app_list=app_list show_changelinks=True %}
+    </section>
+  </div>
+
+  <aside>
+    <section class="nq-panel">
+      <div class="nq-panel-header"><h2>数据状态</h2></div>
+      <div class="nq-panel-body">
+        <ul class="nq-health-list">
+          <li><span>重点/意向客户</span><strong>{{ metrics.priority_customers }}</strong></li>
+          <li><span>跟进日志</span><strong>{{ metrics.contact_logs }}</strong></li>
+          <li><span>最近同步时间</span><strong>{{ metrics.last_sync_at }}</strong></li>
+          <li><span>活跃系统账号</span><strong>{{ metrics.active_users }}</strong></li>
+        </ul>
+      </div>
+    </section>
+    <section class="nq-panel">
+      <div class="nq-panel-header"><h2>使用建议</h2></div>
+      <div class="nq-panel-body">
+        <ul class="nq-health-list">
+          <li><span>客户日常处理</span><strong><a href="{% url 'customer_list' %}">前往客户系统</a></strong></li>
+          <li><span>批量导入导出</span><strong><a href="{% url 'customer_import' %}">导入客户</a></strong></li>
+          <li><span>权限和同步配置</span><strong>在本页维护</strong></li>
+        </ul>
+      </div>
+    </section>
+  </aside>
+</div>
+{% endblock %}

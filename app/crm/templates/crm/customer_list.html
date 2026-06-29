@@ -1,0 +1,981 @@
+{% extends "crm/base.html" %}
+{% load crm_extras %}
+{% block title %}{{ list_title }}{% endblock %}
+{% block heading %}{{ list_title }}{% endblock %}
+{% block content %}
+<div class="scope-notice" style="margin-bottom:12px;">
+  {% if scope == "public" %}
+    公海：这里只显示非无效、未分配的客户，销售可以认领到自己名下。当前 {{ filtered_record_count }} 条。
+  {% elif scope == "recycled" %}
+    回收站：这里显示主动删除、标记无效或合并归档的客户，可查看详情并按权限恢复。当前 {{ filtered_record_count }} 条。
+  {% elif show_owner_column %}
+    客户管理总表：管理员/销售主管可以查看全部客户和客户所属人。当前 {{ filtered_record_count }} 条。
+  {% else %}
+    我的客户：这里只显示你负责的客户。超过 30 天未联系的客户会按规则进入公海。当前 {{ filtered_record_count }} 条。
+  {% endif %}
+</div>
+
+<div class="summary-row">
+  <div class="metric"><strong>{{ filtered_record_count }}</strong><span>总录入客户</span></div>
+  <div class="metric"><strong>{{ today_new_count }}</strong><span>今日新增</span></div>
+  <div class="metric"><strong>{{ today_due_count }}</strong><span>今日应跟进</span></div>
+  <div class="metric"><strong>{{ key_customer_count }}</strong><span>重点/意向客户</span></div>
+</div>
+
+<form id="customerFilterForm" method="get">
+  <input type="hidden" name="scope" value="{{ scope }}">
+  {% if kind %}<input type="hidden" name="kind" value="{{ kind }}">{% endif %}
+  <input type="hidden" id="quickFilterInput" name="quick" value="{{ filters.quick }}">
+  <input type="hidden" id="customerPerPageInput" name="per_page" value="{{ page_size }}">
+  <div class="toolbar customer-toolbar">
+    <div class="toolbar-left">
+      <a class="button" href="{% url 'customer_create' %}">新增</a>
+      <button type="button" class="button secondary" id="openImportModal">导入</button>
+      <a class="button secondary" href="{% url 'customer_export' %}{% if base_querystring %}?{{ base_querystring }}{% endif %}">导出</a>
+      <div class="quick-filters" aria-label="快捷筛选">
+        <a class="quick-filter {% if not has_active_filters %}active{% endif %}" href="{% url 'customer_list' %}?{{ clear_querystring }}">全部</a>
+        <button class="quick-filter {% if filters.quick == 'due' %}active{% endif %}" type="button" data-quick-filter="due">今日应跟进</button>
+        <button class="quick-filter {% if filters.quick == 'key' %}active{% endif %}" type="button" data-quick-filter="key">重点/意向</button>
+        <button class="quick-filter {% if filters.quick == 'quoted' %}active{% endif %}" type="button" data-quick-filter="quoted">已报价未跟进</button>
+        <button class="quick-filter {% if filters.quick == 'unpaid' %}active{% endif %}" type="button" data-quick-filter="unpaid">未结清</button>
+      </div>
+    </div>
+    <div class="toolbar-right">
+      <div class="main-search">
+        <input name="q" value="{{ q }}" placeholder="查询">
+        <button type="button" class="button secondary" id="toggleAdvancedSearch">更多筛选</button>
+        {% if has_active_filters %}
+          <a class="button secondary clear-search-link" href="{% url 'customer_list' %}?{{ clear_querystring }}">查看全部</a>
+        {% endif %}
+      </div>
+      <button type="button" class="button secondary {% if not can_undo %}disabled{% endif %}" id="undoAction" title="Ctrl+Z / Command+Z" {% if not can_undo %}disabled{% endif %}>撤回</button>
+      <button type="button" class="button secondary {% if not can_redo %}disabled{% endif %}" id="redoAction" title="Ctrl+Y / Command+Y" {% if not can_redo %}disabled{% endif %}>恢复</button>
+      <button type="button" class="button secondary" id="resetColumnOrder">恢复默认</button>
+    </div>
+  </div>
+
+  <div class="search-chips">
+    {% if q %}<span class="search-chip">关键词：{{ q }}</span>{% endif %}
+    {% if filters.quick == "due" %}<span class="search-chip">今日应跟进</span>{% endif %}
+    {% if filters.quick == "key" %}<span class="search-chip">重点/意向</span>{% endif %}
+    {% for item in filters.grades %}<span class="search-chip">级别：{{ item }}</span>{% endfor %}
+    {% for item in filters.types %}<span class="search-chip">类型：{{ item }}</span>{% endfor %}
+    {% for item in filters.demands %}<span class="search-chip">需求：{{ item }}</span>{% endfor %}
+    {% for item in filters.customer_statuses %}<span class="search-chip">状态：{{ item }}</span>{% endfor %}
+    {% for item in filters.sources %}<span class="search-chip">来源：{{ item }}</span>{% endfor %}
+  </div>
+
+  <div class="advanced-search-panel" id="advancedSearchPanel" hidden>
+    <div class="advanced-search-grid">
+      <div class="filter-field">
+        <label>客户级别</label>
+        <select name="grade" multiple data-dropdown-multiple="1" data-placeholder="全部客户级别">
+          {% for value,label in grade_choices %}
+            <option value="{{ value }}" {% if value in filters.grades %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="filter-field">
+        <label>客户类型</label>
+        <select name="customer_type" multiple data-dropdown-multiple="1" data-placeholder="全部客户类型">
+          {% for item in customer_type_options %}
+            <option value="{{ item }}" {% if item in filters.types %}selected{% endif %}>{{ item }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="filter-field">
+        <label>客户需求</label>
+        <select name="demand" multiple data-dropdown-multiple="1" data-placeholder="全部客户需求">
+          {% for item in demand_options %}
+            <option value="{{ item }}" {% if item in filters.demands %}selected{% endif %}>{{ item }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="filter-field">
+        <label>客户状态</label>
+        <select name="customer_status" multiple data-dropdown-multiple="1" data-placeholder="全部客户状态">
+          {% for item in customer_status_options %}
+            <option value="{{ item }}" {% if item in filters.customer_statuses %}selected{% endif %}>{{ item }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="filter-field">
+        <label>线索来源</label>
+        <select name="source_channel" multiple data-dropdown-multiple="1" data-placeholder="全部线索来源">
+          {% for item in source_options %}
+            <option value="{{ item }}" {% if item in filters.sources %}selected{% endif %}>{{ item }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if show_owner_column %}
+      <div class="filter-field">
+        <label>客户经理</label>
+        <select name="owner" multiple data-dropdown-multiple="1" data-placeholder="全部客户经理">
+          {% for item in owner_options %}
+            <option value="{{ item.value }}" {% if item.value in filters.owners %}selected{% endif %}>{{ item.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div class="filter-field">
+        <label>未联系天数</label>
+        <select name="uncontacted_days">
+          <option value="">不限</option><option value="3" {% if filters.uncontacted_days == '3' %}selected{% endif %}>3天以上</option><option value="7" {% if filters.uncontacted_days == '7' %}selected{% endif %}>7天以上</option><option value="14" {% if filters.uncontacted_days == '14' %}selected{% endif %}>14天以上</option><option value="21" {% if filters.uncontacted_days == '21' %}selected{% endif %}>21天以上</option><option value="30" {% if filters.uncontacted_days == '30' %}selected{% endif %}>30天以上</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label>产品需求</label>
+        <select name="product_interest" multiple data-dropdown-multiple="1" data-placeholder="全部产品需求">
+          {% for item in product_options %}<option value="{{ item }}" {% if item in filters.products %}selected{% endif %}>{{ item }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="filter-field"><label>国家/地区</label><input name="country_region" value="{{ filters.country_region }}" placeholder="国家或地区"></div>
+      <div class="filter-field">
+        <label for="date-field">日期字段</label>
+        <select id="date-field" name="date_field">
+          <option value="" {% if not filters.date_field %}selected{% endif %}>日期不限</option>
+          <option value="lastContact" {% if filters.date_field == "lastContact" %}selected{% endif %}>最后联系时间</option>
+          <option value="nextContact" {% if filters.date_field == "nextContact" %}selected{% endif %}>下次联系时间</option>
+          <option value="created" {% if filters.date_field == "created" %}selected{% endif %}>创建时间</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label>日期范围</label>
+        <div class="date-range">
+          <input name="date_from" value="{{ filters.date_from }}" type="date" aria-label="开始日期">
+          <span class="date-separator">至</span>
+          <input name="date_to" value="{{ filters.date_to }}" type="date" aria-label="结束日期">
+        </div>
+      </div>
+      <div class="filter-field">
+        <label for="sort-field">排序字段</label>
+        <select id="sort-field" name="sort_field">
+          <option value="created" {% if filters.sort_field == "created" %}selected{% endif %}>创建时间</option>
+          <option value="lastContact" {% if filters.sort_field == "lastContact" %}selected{% endif %}>最后联系时间</option>
+          <option value="nextContact" {% if filters.sort_field == "nextContact" %}selected{% endif %}>下次联系时间</option>
+          <option value="days" {% if filters.sort_field == "days" %}selected{% endif %}>未联系天数</option>
+          <option value="grade" {% if filters.sort_field == "grade" %}selected{% endif %}>客户级别</option>
+          <option value="type" {% if filters.sort_field == "type" %}selected{% endif %}>客户类型</option>
+          <option value="demand" {% if filters.sort_field == "demand" %}selected{% endif %}>客户需求</option>
+          <option value="status" {% if filters.sort_field == "status" %}selected{% endif %}>客户状态</option>
+          <option value="source" {% if filters.sort_field == "source" %}selected{% endif %}>线索来源</option>
+          <option value="name" {% if filters.sort_field == "name" %}selected{% endif %}>客户名称</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label for="sort-direction">排序方式</label>
+        <select id="sort-direction" name="sort_direction">
+          <option value="desc" {% if filters.sort_direction == "desc" %}selected{% endif %}>降序 / 从近到远</option>
+          <option value="asc" {% if filters.sort_direction == "asc" %}selected{% endif %}>升序 / 从远到近</option>
+        </select>
+      </div>
+    </div>
+    <div class="advanced-search-actions">
+      <button type="button" class="button secondary" id="closeAdvancedSearch">关闭</button>
+      <a class="button secondary" href="{% url 'customer_list' %}?{{ clear_querystring }}">清空</a>
+      <button type="submit">查询</button>
+    </div>
+  </div>
+</form>
+
+<div class="modal-backdrop" id="importModal">
+  <section class="modal">
+    <div class="modal-header">
+      <h2>导入客户资料</h2>
+      <button class="button secondary" type="button" data-close-import-modal>关闭</button>
+    </div>
+    <form method="post" action="{% url 'customer_import' %}" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div class="detail-body">
+        <div class="scope-notice">支持 .xlsx 和 .csv。老式 .xls 请先另存为 .xlsx 后再导入。</div>
+        <div class="form-grid">
+          <div class="form-row full">
+            <label for="import-file">表格文件</label>
+            <input id="import-file" name="import_file" type="file" accept=".xlsx,.csv,.xls" required>
+          </div>
+          <div class="form-row">
+            <label for="duplicate-mode">重复资料</label>
+            <select id="duplicate-mode" name="duplicate_mode">
+              <option value="merge">合并资料到原客户</option>
+              <option value="skip">取消本次新增</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label for="overwrite-import">覆盖已有字段</label>
+            <select id="overwrite-import" name="overwrite">
+              <option value="">不覆盖，只补空白</option>
+              <option value="1">覆盖已有内容</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="button secondary" type="button" data-close-import-modal>取消</button>
+        <button type="submit">预览并匹配</button>
+      </div>
+    </form>
+  </section>
+</div>
+
+<div class="modal-backdrop" id="inlineEditModal">
+  <section class="modal">
+    <div class="modal-header">
+      <h2 id="inlineEditTitle">修改字段</h2>
+      <button class="button secondary" type="button" data-close-inline-modal>关闭</button>
+    </div>
+    <div class="detail-body">
+      <div class="detail-subtitle" id="inlineEditSubtitle"></div>
+      <div id="inlineEditControl"></div>
+      <div class="muted">只有点击“确认保存”后才会写入；Esc 取消，Ctrl+Z / Command+Z 撤回上次保存。</div>
+    </div>
+    <div class="modal-actions">
+      <button class="button secondary" type="button" data-close-inline-modal>取消</button>
+      <button type="button" id="saveInlineEdit">确认保存</button>
+    </div>
+  </section>
+</div>
+
+{% if filtered_record_count %}
+<button type="button" class="button secondary" id="selectFilteredRows" title="选择当前筛选结果 {{ filtered_record_count }} 条，不只当前页。">全局全选</button>
+{% endif %}
+
+<div class="bulk-action-bar" id="bulkActionBar" hidden>
+  <strong id="selectedRowsText">已选择 0 条</strong>
+  <div class="bulk-actions">
+    {% if scope == "public" %}<button type="submit" form="bulkCustomerForm" name="action" value="claim">认领所选</button>{% endif %}
+    <button type="button" class="button secondary" id="batchExport">导出所选</button>
+    {% if scope != "public" or show_owner_column %}<button type="submit" form="bulkCustomerForm" class="button danger" name="action" value="delete" onclick="return confirmBulkDelete();">删除所选</button>{% endif %}
+    <button type="button" class="button secondary" id="clearSelection">取消选择</button>
+  </div>
+</div>
+
+<form id="bulkCustomerForm" method="post" action="{% url 'customer_bulk_action' %}">
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+  <input type="hidden" id="selectionScopeInput" name="selection_scope" value="page">
+  <input type="hidden" id="selectionQuerystringInput" name="selection_querystring" value="{{ base_querystring }}">
+  <div class="table-shell customer-table-shell" data-current-page-size="{{ page_size }}" data-min-page-size="{{ min_page_size }}" data-max-page-size="{{ max_page_size }}">
+    <table class="wide-table customer-table">
+      <thead>
+        <tr>
+          <th class="select-col sticky-select"><input type="checkbox" id="selectAllRows" aria-label="全选"></th>
+          <th class="sticky-no locked-header">客户编号</th>
+          <th data-col="name">客户名称</th>
+          <th data-col="official">正式名称/昵称</th>
+          {% if show_owner_column %}<th data-col="owner">客户经理</th><th data-col="ownership">客户归属</th>{% endif %}
+          <th data-col="grade">客户级别</th>
+          <th data-col="type">客户类型</th>
+          <th data-col="demand">客户需求</th>
+          <th data-col="status">客户状态</th>
+          <th data-col="deal">成交状态</th>
+          <th data-col="phone">客户电话</th>
+          <th data-col="wechat">微信</th>
+          <th data-col="email">邮箱</th>
+          <th data-col="last_contact">最后联系时间</th>
+          <th data-col="uncontacted">未联系天数</th>
+          <th data-col="next_contact">下次联系时间</th>
+          <th data-col="region">地区</th>
+          <th data-col="source">线索来源</th>
+          <th data-col="contact">联系人</th>
+          <th data-col="notes">沟通记录</th>
+          <th data-col="created">创建时间</th>
+          <th data-col="image">图片</th>
+          <th data-col="actions" class="locked-header">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for customer in customers %}
+        <tr data-row-selectable data-inline-url="{% url 'customer_inline_update' customer.pk %}" data-customer-label="{{ customer }} ｜ {{ customer.customer_no }}">
+          <td class="select-col sticky-select"><input type="checkbox" name="ids" value="{{ customer.pk }}" aria-label="选择 {{ customer.customer_no }}"></td>
+          <td class="nowrap sticky-no">{{ customer.customer_no }}</td>
+          <td class="clip" data-col="name" data-edit-field="name" data-current-value="{{ customer.name|default:'' }}"><a href="{% url 'customer_detail' customer.pk %}">{{ customer.display_name }}</a></td>
+          <td class="clip" data-col="official" data-edit-field="official_name" data-current-value="{{ customer.official_name|default:'' }}">{{ customer.official_name|default:customer.nickname|default:"未填写" }}</td>
+          {% if show_owner_column %}
+            <td class="nowrap" data-col="owner" data-edit-field="owner_id" data-current-value="{{ customer.owner_id|default:'' }}"><span class="tag tag-info">{{ customer.owner_display_label|default:customer.owner_display|default:"未分配" }}</span></td>
+            <td class="nowrap" data-col="ownership" data-edit-field="status" data-current-value="{{ customer.ownership_value|default:customer.status }}"><span class="tag {% if customer.ownership_value == 'public' %}tag-key{% else %}tag-contacted{% endif %}">{{ customer.ownership_display|default:customer.get_status_display }}</span></td>
+          {% endif %}
+          <td class="nowrap detail-cell has-edit-trigger" data-col="grade" data-edit-field="grade" data-current-value="{{ customer.grade }}">
+            <span class="tag {{ customer.get_grade_display|grade_tag_class }}">{{ customer.get_grade_display }}</span>
+            <button class="cell-detail-button" type="button" data-edit-trigger>查看详情</button>
+          </td>
+          <td class="clip detail-cell has-edit-trigger" data-col="type" data-edit-field="customer_type" data-current-value="{{ customer.customer_type|default:'' }}">
+            {% if customer.customer_type %}<span class="tag tag-normal">{{ customer.customer_type }}</span>{% else %}<span class="muted">未填写</span>{% endif %}
+            <button class="cell-detail-button" type="button" data-edit-trigger>查看详情</button>
+          </td>
+          <td class="clip detail-cell demand-detail-cell has-edit-trigger" data-col="demand" data-edit-field="demand" data-current-value="{{ customer.demand|default:'' }}">
+            {% for item in customer.demand|split_csv %}
+              <span class="tag tag-potential">{{ item }}</span>
+            {% empty %}
+              <span class="muted">未填写</span>
+            {% endfor %}
+            <button class="cell-detail-button" type="button" data-edit-trigger>查看详情</button>
+          </td>
+          <td class="clip detail-cell has-edit-trigger" data-col="status" data-edit-field="customer_status_text" data-current-value="{{ customer.customer_status_text|business_status_tags|join:',' }}">
+            {% for item in customer.customer_status_text|business_status_tags %}
+              <span class="tag {{ item|status_tag_class }}">{{ item }}</span>
+            {% empty %}
+              <span class="muted">未填写</span>
+            {% endfor %}
+            <button class="cell-detail-button" type="button" data-edit-trigger>查看详情</button>
+          </td>
+          <td class="nowrap detail-cell has-edit-trigger" data-col="deal" data-edit-field="is_deal" data-current-value="{% if customer.is_deal or customer.status == 'deal' %}1{% else %}0{% endif %}">
+            {% if customer.is_deal or customer.status == 'deal' %}<span class="tag tag-success">已成交</span>{% else %}<span class="tag tag-muted">未成交</span>{% endif %}
+            <button class="cell-detail-button" type="button" data-edit-trigger>查看详情</button>
+          </td>
+          <td class="nowrap" data-col="phone" data-edit-field="phone" data-current-value="{{ customer.phone|default:'' }}">{{ customer.phone|default:"未填写" }}</td>
+          <td class="nowrap detail-cell has-edit-trigger" data-col="wechat" data-edit-field="wechat" data-current-value="{{ customer.wechat|default:'' }}">
+            <span>{{ customer.wechat|default:"未填写" }}</span>
+            <button class="cell-detail-button" type="button" data-edit-trigger>查看详情</button>
+          </td>
+          <td class="clip" data-col="email" data-edit-field="email" data-current-value="{{ customer.email|default:'' }}">{{ customer.email|default:"未填写" }}</td>
+          <td class="nowrap" data-col="last_contact" data-edit-field="last_contact_at" data-current-value="{{ customer.last_contact_at|date:'Y-m-d'|default:'' }}">{{ customer.last_contact_at|date:"Y-m-d"|default:"未填写" }}</td>
+          <td class="nowrap" data-col="uncontacted">{{ customer.uncontacted_days|default_if_none:"未填写" }}</td>
+          <td class="nowrap" data-col="next_contact" data-edit-field="next_contact_at" data-current-value="{{ customer.next_contact_at|date:'Y-m-d'|default:'' }}">{{ customer.next_contact_at|date:"Y-m-d"|default:"未填写" }}</td>
+          <td class="nowrap" data-col="region" data-edit-field="region" data-current-value="{{ customer.location_display|default:'' }}">{{ customer.location_display|default:"未填写" }}</td>
+          <td class="nowrap" data-col="source" data-edit-field="source_channel" data-current-value="{{ customer.source_channel|default:'' }}">{{ customer.source_channel|default:"未填写" }}</td>
+          <td class="nowrap" data-col="contact" data-edit-field="contact_name" data-current-value="{{ customer.contact_name|default:'' }}">{{ customer.contact_name|default:"未填写" }}</td>
+          <td class="nowrap" data-col="notes"><a class="button ghost" href="{% url 'customer_detail' customer.pk %}">查看详情</a></td>
+          <td class="nowrap" data-col="created">{{ customer.created_time_display|date:"Y-m-d H:i"|default:"未填写" }}</td>
+          <td class="nowrap detail-cell" data-col="image"
+              data-detail-title="客户图片"
+              data-detail-subtitle="{{ customer }} ｜ {{ customer.customer_no }}"
+              {% if customer.image %}data-detail-image="{{ customer.image.url }}"{% elif customer.attachment_note %}data-detail-body="{{ customer.attachment_note }}"{% else %}data-detail-body="未上传图片或附件说明"{% endif %}
+              data-detail-edit-url="{% url 'customer_edit' customer.pk %}"
+              data-detail-edit-label="修改图片">
+            {% if customer.image %}
+              <span class="muted">图片</span>
+            {% elif customer.attachment_note %}
+              <span class="muted">附件说明</span>
+            {% else %}
+              <span class="muted">未填写</span>
+            {% endif %}
+            <button class="cell-detail-button" type="button">查看详情</button>
+          </td>
+          <td class="nowrap" data-col="actions">
+            <div class="action-cell">
+              <a class="button secondary" href="{% url 'customer_detail' customer.pk %}">查看详情</a>
+              {% if scope != "recycled" %}
+                {% if show_owner_column or customer.owner_id == request.user.id %}
+                  <button class="button danger" type="submit" formaction="{% url 'customer_delete' customer.pk %}" formmethod="post" onclick="return confirm('确认删除客户「{{ customer }}」？删除后会进入回收站。');">删除</button>
+                {% endif %}
+              {% endif %}
+              {% if scope == "public" %}
+                <button class="button secondary" type="submit" formaction="{% url 'customer_claim' customer.pk %}" formmethod="post">认领</button>
+              {% elif scope == "recycled" %}
+                <button class="button secondary" type="submit" formaction="{% url 'customer_recycle_restore' customer.pk %}" formmethod="post">恢复</button>
+              {% else %}
+                <details class="more-actions">
+                  <summary class="button secondary">更多</summary>
+                  <div class="more-actions-menu">
+                    <a class="button secondary" href="{% url 'contact_log_create' %}?customer={{ customer.pk }}">新增跟进</a>
+                    <a class="button secondary" href="{% url 'quote_create' %}?customer={{ customer.pk }}">新增报价</a>
+                    <a class="button secondary" href="{% url 'task_create' %}?customer={{ customer.pk }}">新建任务</a>
+                    {% if show_owner_column %}
+                      <a class="button secondary" href="{% url 'customer_transfer' customer.pk %}">转移</a>
+                      <a class="button secondary" href="{% url 'customer_merge' customer.pk %}">合并</a>
+                    {% endif %}
+                    <button class="button danger" type="submit" formaction="{% url 'customer_mark_invalid' customer.pk %}" formmethod="post" onclick="return confirm('确认标记客户「{{ customer }}」为无效？');">标记无效</button>
+                  </div>
+                </details>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}<tr><td colspan="{% if show_owner_column %}23{% else %}21{% endif %}" class="muted">没有找到资料。</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</form>
+
+<div class="pagination-bar">
+  <div class="muted">
+    总录入 {{ total_record_count }} 条{% if filtered_record_count != total_record_count %}，当前筛选 {{ filtered_record_count }} 条{% endif %} ｜ 第 {{ page_obj.number }} / {{ paginator.num_pages }} 页
+  </div>
+  <div class="pagination-actions">
+    {% if page_obj.has_previous %}
+      <a class="button secondary" href="{% if base_querystring %}?{{ base_querystring }}&page=1{% else %}?page=1{% endif %}">首页</a>
+      <a class="button secondary" href="{% if base_querystring %}?{{ base_querystring }}&page={{ page_obj.previous_page_number }}{% else %}?page={{ page_obj.previous_page_number }}{% endif %}">上一页</a>
+    {% else %}
+      <span class="button secondary disabled">首页</span>
+      <span class="button secondary disabled">上一页</span>
+    {% endif %}
+    {% if page_obj.has_next %}
+      <a class="button secondary" href="{% if base_querystring %}?{{ base_querystring }}&page={{ page_obj.next_page_number }}{% else %}?page={{ page_obj.next_page_number }}{% endif %}">下一页</a>
+      <a class="button secondary" href="{% if base_querystring %}?{{ base_querystring }}&page={{ paginator.num_pages }}{% else %}?page={{ paginator.num_pages }}{% endif %}">末页</a>
+    {% else %}
+      <span class="button secondary disabled">下一页</span>
+      <span class="button secondary disabled">末页</span>
+    {% endif %}
+    <form method="get" class="goto-page-form">
+      <input type="hidden" name="scope" value="{{ scope }}">
+      {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+      {% if filters.quick %}<input type="hidden" name="quick" value="{{ filters.quick }}">{% endif %}
+      <input type="hidden" name="per_page" value="{{ page_size }}">
+      <label class="muted" for="goto-page">前往</label>
+      <input id="goto-page" name="page" type="number" min="1" max="{{ paginator.num_pages }}" value="{{ page_obj.number }}">
+      <button type="submit">跳转</button>
+    </form>
+  </div>
+</div>
+
+{{ inline_options|json_script:"inlineOptions" }}
+<script>
+  var inlineOptions = JSON.parse(document.getElementById("inlineOptions").textContent);
+  var inlineFieldLabels = {
+    name: "客户名称",
+    official_name: "正式名称",
+    grade: "客户级别",
+    customer_type: "客户类型",
+    demand: "客户需求",
+    customer_status_text: "客户状态",
+    is_deal: "成交状态",
+    phone: "客户电话",
+    wechat: "微信",
+    email: "邮箱",
+    last_contact_at: "最后联系时间",
+    next_contact_at: "下次联系时间",
+    region: "地区",
+    source_channel: "线索来源",
+    contact_name: "联系人",
+    owner_id: "客户经理",
+    status: "客户归属"
+  };
+  var activeInlineCell = null;
+  var inlineModal = document.getElementById("inlineEditModal");
+  var inlineTitle = document.getElementById("inlineEditTitle");
+  var inlineSubtitle = document.getElementById("inlineEditSubtitle");
+  var inlineControl = document.getElementById("inlineEditControl");
+  function csrfToken() {
+    var input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+    return input ? input.value : "";
+  }
+  function optionSelectHtml(field, value) {
+    var options = inlineOptions[field] || [];
+    return '<select id="inlineEditInput">' + options.map(function (item) {
+      var itemValue = String(typeof item === "string" ? item : item.value || "");
+      var label = String(typeof item === "string" ? item : item.label || "");
+      return '<option value="' + itemValue.replace(/"/g, "&quot;") + '"' + (itemValue === value ? " selected" : "") + '>' + label + '</option>';
+    }).join("") + '</select>';
+  }
+  function selectedMap(value) {
+    var selected = {};
+    String(value || "").split(/[，,、;；\n]+/).forEach(function (item) {
+      item = item.trim();
+      if (item) selected[item] = true;
+    });
+    return selected;
+  }
+  function escapeHtml(value) {
+    return String(value || "").replace(/[&<>"']/g, function (char) {
+      return {"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"}[char];
+    });
+  }
+  function multiOptionSelectHtml(field, value) {
+    var options = inlineOptions[field] || [];
+    var selected = selectedMap(value);
+    return '<select id="inlineEditInput" multiple size="' + Math.min(Math.max(options.length, 4), 10) + '">' + options.map(function (item) {
+      var itemValue = String(typeof item === "string" ? item : item.value || "");
+      var label = String(typeof item === "string" ? item : item.label || "");
+      return '<option value="' + escapeHtml(itemValue) + '"' + (selected[itemValue] ? " selected" : "") + '>' + escapeHtml(label) + '</option>';
+    }).join("") + '</select>';
+  }
+  function multiCheckboxHtml(field, value) {
+    var options = inlineOptions[field] || [];
+    var selected = selectedMap(value);
+    return '<div id="inlineEditInput" class="inline-multi-options" data-multi-checkbox="1" role="group">' + options.map(function (item) {
+      var itemValue = String(typeof item === "string" ? item : item.value || "");
+      var label = String(typeof item === "string" ? item : item.label || "");
+      var checked = selected[itemValue] ? ' checked' : '';
+      return '<label class="inline-multi-option"><input type="checkbox" value="' + escapeHtml(itemValue) + '"' + checked + '><span>' + escapeHtml(label) + '</span></label>';
+    }).join("") + '</div>';
+  }
+  function inlineEditValue(input) {
+    if (!input) return "";
+    if (input.dataset && input.dataset.multiCheckbox === "1") {
+      return Array.prototype.slice.call(input.querySelectorAll('input[type="checkbox"]:checked')).map(function (checkbox) {
+        return checkbox.value;
+      }).join(",");
+    }
+    if (input.tagName === "SELECT" && input.multiple) {
+      return Array.prototype.slice.call(input.selectedOptions).map(function (option) {
+        return option.value;
+      }).join(",");
+    }
+    return input.value;
+  }
+  function openInlineEditor(cell) {
+    activeInlineCell = cell;
+    var field = cell.dataset.editField;
+    var value = cell.dataset.currentValue || "";
+    inlineTitle.textContent = inlineFieldLabels[field] || "修改字段";
+    inlineSubtitle.textContent = cell.closest("tr").dataset.customerLabel || "";
+    if (field === "grade" || field === "customer_type" || field === "source_channel" || field === "owner_id" || field === "status" || field === "is_deal") {
+      inlineControl.innerHTML = optionSelectHtml(field, value);
+    } else if (field === "last_contact_at" || field === "next_contact_at") {
+      inlineControl.innerHTML = '<input id="inlineEditInput" type="date" value="' + value.replace(/"/g, "&quot;") + '">';
+    } else if (field === "customer_status_text") {
+      inlineControl.innerHTML = multiCheckboxHtml(field, value);
+    } else if (field === "demand") {
+      inlineControl.innerHTML = multiCheckboxHtml(field, value);
+    } else {
+      inlineControl.innerHTML = '<input id="inlineEditInput" value="' + value.replace(/"/g, "&quot;") + '">';
+    }
+    inlineModal.classList.add("open");
+    setTimeout(function () {
+      var input = document.getElementById("inlineEditInput");
+      if (input) input.focus();
+    }, 0);
+  }
+  function closeInlineEditor() {
+    activeInlineCell = null;
+    inlineModal.classList.remove("open");
+  }
+  document.querySelectorAll("[data-close-inline-modal]").forEach(function (button) {
+    button.addEventListener("click", closeInlineEditor);
+  });
+  inlineModal.addEventListener("click", function (event) {
+    if (event.target === inlineModal) closeInlineEditor();
+  });
+  document.querySelectorAll("[data-edit-trigger]").forEach(function (button) {
+    button.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      var cell = button.closest("[data-edit-field]");
+      if (cell) openInlineEditor(cell);
+    });
+  });
+  document.querySelectorAll("[data-edit-field]").forEach(function (cell) {
+    cell.addEventListener("click", function (event) {
+      if (event.target.closest("a, button, input, select, textarea")) return;
+      event.stopPropagation();
+      openInlineEditor(cell);
+    });
+  });
+  document.getElementById("saveInlineEdit").addEventListener("click", function () {
+    if (!activeInlineCell) return;
+    var input = document.getElementById("inlineEditInput");
+    var row = activeInlineCell.closest("tr");
+    fetch(row.dataset.inlineUrl, {
+      method: "POST",
+      headers: {"Content-Type": "application/json", "X-CSRFToken": csrfToken()},
+      body: JSON.stringify({field: activeInlineCell.dataset.editField, value: inlineEditValue(input)})
+    }).then(function (response) {
+      return response.json().then(function (data) { return {ok: response.ok, data: data}; });
+    }).then(function (result) {
+      if (!result.ok || !result.data.ok) {
+        alert(result.data.error || "保存失败");
+        return;
+      }
+      window.location.reload();
+    }).catch(function () {
+      alert("保存失败，请稍后重试。");
+    });
+  });
+  function runHistoryAction(action) {
+    var form = new FormData();
+    form.append("action", action);
+    fetch("{% url 'customer_history_action' %}", {
+      method: "POST",
+      headers: {"X-CSRFToken": csrfToken()},
+      body: form
+    }).then(function (response) {
+      return response.json().then(function (data) { return {ok: response.ok, data: data}; });
+    }).then(function (result) {
+      if (!result.ok || !result.data.ok) {
+        alert(result.data.error || "操作失败");
+        return;
+      }
+      window.location.reload();
+    });
+  }
+  var undoAction = document.getElementById("undoAction");
+  var redoAction = document.getElementById("redoAction");
+  if (undoAction) undoAction.addEventListener("click", function () { runHistoryAction("undo"); });
+  if (redoAction) redoAction.addEventListener("click", function () { runHistoryAction("redo"); });
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && inlineModal.classList.contains("open")) closeInlineEditor();
+    if (event.key === "Escape" && importModal && importModal.classList.contains("open")) importModal.classList.remove("open");
+    var isModifier = event.ctrlKey || event.metaKey;
+    if (isModifier && event.key.toLowerCase() === "z") {
+      event.preventDefault();
+      if (undoAction && !undoAction.disabled) runHistoryAction("undo");
+    }
+    if (isModifier && event.key.toLowerCase() === "y") {
+      event.preventDefault();
+      if (redoAction && !redoAction.disabled) runHistoryAction("redo");
+    }
+  });
+
+  var advancedPanel = document.getElementById("advancedSearchPanel");
+  var toggleAdvanced = document.getElementById("toggleAdvancedSearch");
+  var closeAdvanced = document.getElementById("closeAdvancedSearch");
+  if (toggleAdvanced && advancedPanel) {
+    toggleAdvanced.addEventListener("click", function () {
+      advancedPanel.hidden = !advancedPanel.hidden;
+    });
+  }
+  if (closeAdvanced && advancedPanel) {
+    closeAdvanced.addEventListener("click", function () {
+      advancedPanel.hidden = true;
+    });
+  }
+  var importModal = document.getElementById("importModal");
+  var openImport = document.getElementById("openImportModal");
+  if (openImport && importModal) {
+    openImport.addEventListener("click", function () {
+      importModal.classList.add("open");
+    });
+  }
+  document.querySelectorAll("[data-close-import-modal]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      importModal.classList.remove("open");
+    });
+  });
+  if (importModal) {
+    importModal.addEventListener("click", function (event) {
+      if (event.target === importModal) importModal.classList.remove("open");
+    });
+  }
+  document.querySelectorAll("[data-quick-filter]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      document.getElementById("quickFilterInput").value = button.dataset.quickFilter || "";
+      document.getElementById("customerFilterForm").submit();
+    });
+  });
+
+  function closeOtherMoreMenus(current) {
+    document.querySelectorAll("details.more-actions[open]").forEach(function (details) {
+      if (details !== current) details.removeAttribute("open");
+    });
+  }
+  document.querySelectorAll("details.more-actions").forEach(function (details) {
+    details.addEventListener("click", function (event) {
+      event.stopPropagation();
+    });
+    details.addEventListener("toggle", function () {
+      if (details.open) closeOtherMoreMenus(details);
+    });
+  });
+  document.addEventListener("click", function (event) {
+    if (!event.target.closest("details.more-actions")) closeOtherMoreMenus(null);
+  });
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") closeOtherMoreMenus(null);
+  });
+  var bulkBar = document.getElementById("bulkActionBar");
+  var selectedText = document.getElementById("selectedRowsText");
+  var selectAll = document.getElementById("selectAllRows");
+  var selectFilteredRows = document.getElementById("selectFilteredRows");
+  var selectionScopeInput = document.getElementById("selectionScopeInput");
+  var rowChecks = Array.prototype.slice.call(document.querySelectorAll('input[name="ids"]'));
+  var filteredRecordCount = Number("{{ filtered_record_count|default:0 }}") || 0;
+  function selectedIds() {
+    return rowChecks.filter(function (box) { return box.checked; }).map(function (box) { return box.value; });
+  }
+  function isFilteredSelection() {
+    return selectionScopeInput && selectionScopeInput.value === "filtered";
+  }
+  function setPageSelectionMode() {
+    if (selectionScopeInput) selectionScopeInput.value = "page";
+  }
+  function setFilteredSelectionMode() {
+    if (selectionScopeInput) selectionScopeInput.value = "filtered";
+  }
+  function renderSelection() {
+    var ids = selectedIds();
+    var filteredSelection = isFilteredSelection();
+    bulkBar.hidden = !filteredSelection && ids.length === 0;
+    selectedText.textContent = filteredSelection ? "已全局选择 " + filteredRecordCount + " 条" : "已选择 " + ids.length + " 条";
+    rowChecks.forEach(function (box) {
+      var row = box.closest("tr");
+      if (row) row.classList.toggle("selected-row", box.checked || filteredSelection);
+    });
+    if (selectAll) {
+      selectAll.checked = filteredSelection || (ids.length > 0 && ids.length === rowChecks.length);
+      selectAll.indeterminate = !filteredSelection && ids.length > 0 && ids.length < rowChecks.length;
+    }
+  }
+  rowChecks.forEach(function (box) {
+    box.addEventListener("change", function () {
+      setPageSelectionMode();
+      renderSelection();
+    });
+    var row = box.closest("tr");
+    if (row) {
+      row.addEventListener("click", function (event) {
+        if (event.target.closest("a, button, input, select, textarea, label, details, summary, .more-actions, .more-actions-menu, [data-edit-field], [data-detail-title]") || event.target === box) return;
+        setPageSelectionMode();
+        box.checked = !box.checked;
+        renderSelection();
+      });
+    }
+  });
+  if (selectAll) {
+    selectAll.addEventListener("change", function () {
+      setPageSelectionMode();
+      rowChecks.forEach(function (box) { box.checked = selectAll.checked; });
+      renderSelection();
+    });
+  }
+  if (selectFilteredRows) {
+    selectFilteredRows.addEventListener("click", function () {
+      setFilteredSelectionMode();
+      rowChecks.forEach(function (box) { box.checked = true; });
+      renderSelection();
+    });
+  }
+  var clearSelection = document.getElementById("clearSelection");
+  if (clearSelection) {
+    clearSelection.addEventListener("click", function () {
+      setPageSelectionMode();
+      rowChecks.forEach(function (box) { box.checked = false; });
+      renderSelection();
+    });
+  }
+  function confirmBulkDelete() {
+    if (isFilteredSelection()) {
+      return confirm("确认删除当前筛选的全部 " + filteredRecordCount + " 条客户？删除后会进入回收站。");
+    }
+    return confirm("确认删除选中的客户？删除后会进入回收站。");
+  }
+  window.confirmBulkDelete = confirmBulkDelete;
+  var batchExport = document.getElementById("batchExport");
+  if (batchExport) {
+    batchExport.addEventListener("click", function () {
+      var ids = selectedIds();
+      var params;
+      if (isFilteredSelection()) {
+        params = new URLSearchParams(window.location.search);
+        params.delete("page");
+        params.delete("ids");
+      } else {
+        if (!ids.length) return;
+        params = new URLSearchParams();
+        ids.forEach(function (id) { params.append("ids", id); });
+      }
+      window.location.href = "{% url 'customer_export' %}?" + params.toString();
+    });
+  }
+
+  function clampPageSize(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+  function calculatedViewportPageSize() {
+    var shell = document.querySelector(".customer-table-shell");
+    if (!shell) return null;
+    var minSize = parseInt(shell.dataset.minPageSize || "3", 10);
+    var maxSize = parseInt(shell.dataset.maxPageSize || "30", 10);
+    var header = shell.querySelector("thead");
+    var rowHeights = Array.prototype.slice.call(shell.querySelectorAll("tbody tr[data-row-selectable]")).map(function (row) {
+      return row.getBoundingClientRect().height;
+    }).filter(Boolean);
+    var pagination = document.querySelector(".pagination-bar");
+    var rowHeight = rowHeights.length ? Math.max.apply(null, rowHeights) : 42;
+    if (!rowHeight || rowHeight < 28 || rowHeight > 96) rowHeight = 42;
+    var shellTop = shell.getBoundingClientRect().top;
+    var headerHeight = header ? header.getBoundingClientRect().height : 40;
+    var paginationHeight = pagination ? pagination.getBoundingClientRect().height + 12 : 0;
+    var available = window.innerHeight - shellTop - paginationHeight - 18;
+    var target = Math.floor((available - headerHeight) / rowHeight);
+    return clampPageSize(target, minSize, maxSize);
+  }
+  function syncViewportPageSize() {
+    var shell = document.querySelector(".customer-table-shell");
+    if (!shell) return;
+    var current = parseInt(shell.dataset.currentPageSize || "{{ page_size }}", 10);
+    var target = calculatedViewportPageSize();
+    if (!target || target === current) return;
+    var params = new URLSearchParams(window.location.search);
+    if (params.get("per_page") === String(target)) return;
+    params.set("per_page", String(target));
+    window.location.href = window.location.pathname + "?" + params.toString();
+  }
+  var resizePageSizeTimer = null;
+  window.addEventListener("resize", function () {
+    clearTimeout(resizePageSizeTimer);
+    resizePageSizeTimer = setTimeout(syncViewportPageSize, 240);
+  });
+  setTimeout(syncViewportPageSize, 0);
+
+  var columnStorageKey = "crm-crm-column-order-v2::{{ request.user.username|escapejs }}::{{ scope|escapejs }}::{{ show_owner_column|yesno:'admin,sales' }}";
+  var columnWidthStorageKey = "crm-crm-column-width-v1::{{ request.user.username|escapejs }}::{{ scope|escapejs }}::{{ show_owner_column|yesno:'admin,sales' }}";
+  var table = document.querySelector(".customer-table");
+  if (table) {
+    var customerNoHeader = table.querySelector("thead th.sticky-no");
+    if (customerNoHeader && !customerNoHeader.dataset.col) customerNoHeader.dataset.col = "customer_no";
+    Array.prototype.slice.call(table.querySelectorAll("tbody td.sticky-no")).forEach(function (cell) {
+      if (!cell.dataset.col) cell.dataset.col = "customer_no";
+    });
+  }
+  var draggedColumn = null;
+  function movableHeaderCells() {
+    return Array.prototype.slice.call(table.querySelectorAll("thead th[data-col]")).filter(function (cell) {
+      return cell.dataset.col !== "actions" && cell.dataset.col !== "customer_no";
+    });
+  }
+  function currentColumnOrder() {
+    return movableHeaderCells().map(function (cell) { return cell.dataset.col; });
+  }
+  function applyColumnOrder(order) {
+    if (!table || !order || !order.length) return;
+    var normalized = order.slice();
+    currentColumnOrder().forEach(function (col) {
+      if (normalized.indexOf(col) === -1) normalized.push(col);
+    });
+    Array.prototype.slice.call(table.rows).forEach(function (row) {
+      var actionCell = row.querySelector('[data-col="actions"]');
+      normalized.forEach(function (col) {
+        var cell = row.querySelector('[data-col="' + col + '"]');
+        if (cell && cell !== actionCell) {
+          row.insertBefore(cell, actionCell || null);
+        }
+      });
+      if (actionCell) row.appendChild(actionCell);
+    });
+  }
+  function saveColumnOrder(order) {
+    try {
+      localStorage.setItem(columnStorageKey, JSON.stringify(order));
+    } catch (error) {
+      console.warn("列顺序保存失败", error);
+    }
+  }
+  function loadColumnOrder() {
+    try {
+      return JSON.parse(localStorage.getItem(columnStorageKey) || "[]");
+    } catch (error) {
+      return [];
+    }
+  }
+  function resizableHeaderCells() {
+    if (!table) return [];
+    return Array.prototype.slice.call(table.querySelectorAll("thead th[data-col]")).filter(function (cell) {
+      return cell.dataset.col !== "actions" && cell.dataset.col !== "customer_no";
+    });
+  }
+  function loadColumnWidths() {
+    try {
+      return JSON.parse(localStorage.getItem(columnWidthStorageKey) || "{}");
+    } catch (error) {
+      return {};
+    }
+  }
+  function saveColumnWidths(widths) {
+    try {
+      localStorage.setItem(columnWidthStorageKey, JSON.stringify(widths));
+    } catch (error) {
+      console.warn("列宽保存失败", error);
+    }
+  }
+  function applyColumnWidth(col, width) {
+    if (!table || !col || !width) return;
+    var normalizedWidth = Math.max(70, Math.min(560, Math.round(width)));
+    Array.prototype.slice.call(table.querySelectorAll('[data-col="' + col + '"]')).forEach(function (cell) {
+      cell.style.width = normalizedWidth + "px";
+      cell.style.minWidth = normalizedWidth + "px";
+      cell.style.maxWidth = normalizedWidth + "px";
+    });
+  }
+  function applyColumnWidths(widths) {
+    Object.keys(widths || {}).forEach(function (col) {
+      if (col === "customer_no") return;
+      applyColumnWidth(col, widths[col]);
+    });
+  }
+  function bindColumnResize() {
+    resizableHeaderCells().forEach(function (header) {
+      if (header.querySelector(".column-resize-handle")) return;
+      var handle = document.createElement("span");
+      handle.className = "column-resize-handle";
+      handle.setAttribute("aria-hidden", "true");
+      header.appendChild(handle);
+      handle.addEventListener("mousedown", function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        var col = header.dataset.col;
+        var startX = event.clientX;
+        var startWidth = header.getBoundingClientRect().width;
+        header.classList.add("resizing");
+        document.body.classList.add("column-resizing");
+        header.draggable = false;
+        function onMove(moveEvent) {
+          applyColumnWidth(col, startWidth + moveEvent.clientX - startX);
+        }
+        function onUp() {
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+          header.classList.remove("resizing");
+          document.body.classList.remove("column-resizing");
+          header.draggable = header.dataset.col !== "actions" && header.dataset.col !== "customer_no";
+          var widths = loadColumnWidths();
+          widths[col] = Math.round(header.getBoundingClientRect().width);
+          saveColumnWidths(widths);
+        }
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+      });
+    });
+  }
+  function bindColumnDrag() {
+    movableHeaderCells().forEach(function (header) {
+      header.classList.add("draggable-header");
+      header.draggable = true;
+      header.addEventListener("dragstart", function (event) {
+        draggedColumn = header.dataset.col;
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", draggedColumn);
+      });
+      header.addEventListener("dragover", function (event) {
+        event.preventDefault();
+        header.classList.add("drag-over");
+      });
+      header.addEventListener("dragleave", function () {
+        header.classList.remove("drag-over");
+      });
+      header.addEventListener("drop", function (event) {
+        event.preventDefault();
+        header.classList.remove("drag-over");
+        var targetColumn = header.dataset.col;
+        var sourceColumn = draggedColumn || event.dataTransfer.getData("text/plain");
+        draggedColumn = null;
+        if (!sourceColumn || sourceColumn === targetColumn) return;
+        var order = currentColumnOrder();
+        var sourceIndex = order.indexOf(sourceColumn);
+        var targetIndex = order.indexOf(targetColumn);
+        if (sourceIndex < 0 || targetIndex < 0) return;
+        order.splice(sourceIndex, 1);
+        order.splice(targetIndex, 0, sourceColumn);
+        applyColumnOrder(order);
+        if (confirm("确认保存当前表头顺序？以后打开页面会保留这个顺序。")) {
+          saveColumnOrder(order);
+        } else {
+          applyColumnOrder(loadColumnOrder());
+        }
+      });
+      header.addEventListener("dragend", function () {
+        draggedColumn = null;
+        document.querySelectorAll(".customer-table th.drag-over").forEach(function (item) {
+          item.classList.remove("drag-over");
+        });
+      });
+    });
+  }
+  applyColumnOrder(loadColumnOrder());
+  applyColumnWidths(loadColumnWidths());
+  bindColumnDrag();
+  bindColumnResize();
+  var resetColumnOrder = document.getElementById("resetColumnOrder");
+  if (resetColumnOrder) {
+    resetColumnOrder.addEventListener("click", function () {
+      try {
+        localStorage.removeItem(columnStorageKey);
+        localStorage.removeItem(columnWidthStorageKey);
+      } catch (error) {
+        console.warn("列顺序清理失败", error);
+      }
+      window.location.reload();
+    });
+  }
+  renderSelection();
+</script>
+{% endblock %}

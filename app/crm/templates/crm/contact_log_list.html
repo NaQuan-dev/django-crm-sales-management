@@ -1,0 +1,286 @@
+{% extends "crm/base.html" %}
+{% load crm_extras %}
+{% block title %}跟进日志{% endblock %}
+{% block heading %}跟进日志{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <a class="button" href="{% url 'contact_log_create' %}">新增跟进日志</a>
+</div>
+
+<form method="get" class="search-panel">
+  <div class="search-grid">
+    <div class="filter-field">
+      <label for="log-q">关键词</label>
+      <input id="log-q" name="q" value="{{ q }}" placeholder="搜索客户、编号、跟进人、跟进内容">
+    </div>
+    <div class="filter-field">
+      <label for="log-customer">客户</label>
+      <select id="log-customer" name="customer">
+        <option value="">全部客户</option>
+        {% for customer in customer_options %}
+          <option value="{{ customer.pk }}" {% if customer_id == customer.pk|stringformat:"s" %}selected{% endif %}>{{ customer.customer_no }} ｜ {{ customer }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-field">
+      <label for="log-date">跟进日期</label>
+      <input id="log-date" name="contact_date" value="{{ contact_date }}" type="date">
+    </div>
+    <div class="filter-field">
+      <label for="log-method">跟进形式</label>
+      <select id="log-method" name="method">
+        <option value="">全部形式</option>
+        {% for value,label in method_choices %}
+          <option value="{{ value }}" {% if method == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-field">
+      <label for="log-result">跟进结果</label>
+      <select id="log-result" name="result" multiple data-dropdown-multiple="1" data-placeholder="全部结果">
+        <option value="">全部结果</option>
+        {% for item in result_options %}
+          <option value="{{ item }}" {% if item in result %}selected{% endif %}>{{ item }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <div class="search-actions">
+    <a class="button secondary" href="{% url 'contact_log_list' %}">清空</a>
+    <button type="submit">查询</button>
+  </div>
+</form>
+
+<div class="modal-backdrop" id="logInlineEditModal">
+  <section class="modal">
+    <div class="modal-header">
+      <h2 id="logInlineEditTitle">修改字段</h2>
+      <button class="button secondary" type="button" data-close-log-inline-modal>关闭</button>
+    </div>
+    <div class="detail-body">
+      <div class="detail-subtitle" id="logInlineEditSubtitle"></div>
+      <div id="logInlineEditControl"></div>
+      <div class="muted">只有点击“确认保存”后才会写入。</div>
+    </div>
+    <div class="modal-actions">
+      <button class="button secondary" type="button" data-close-log-inline-modal>取消</button>
+      <button type="button" id="saveLogInlineEdit">确认保存</button>
+    </div>
+  </section>
+</div>
+
+<div class="table-scroll">
+  <table class="record-table compact-table">
+    <thead>
+      <tr>
+        <th>跟进时间</th>
+        <th>客户编号</th>
+        <th>客户名称</th>
+        <th>跟进人</th>
+        <th>跟进形式</th>
+        <th>跟进内容</th>
+        <th>跟进结果</th>
+        <th>下次联系时间</th>
+        <th>照片</th>
+        <th>音频</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in logs %}
+      <tr data-row-selectable data-inline-url="{% url 'contact_log_inline_update' log.pk %}" data-record-label="{{ log.customer }} ｜ {{ log.contact_at|date:'Y-m-d H:i' }}">
+        <td class="nowrap" data-edit-field="contact_at" data-current-value="{{ log.contact_at|date:'Y-m-d H:i' }}">{{ log.contact_at|date:"Y-m-d H:i" }}</td>
+        <td class="nowrap">{{ log.customer.customer_no }}</td>
+        <td class="clip"><a href="{% url 'customer_detail' log.customer.pk %}">{{ log.customer }}</a></td>
+        <td class="nowrap" data-edit-field="follower_name" data-current-value="{{ log.follower_name|default:'' }}">{{ log.follower_name|default:log.created_by|default:"未填写" }}</td>
+        <td class="nowrap detail-cell has-edit-trigger" data-edit-field="method" data-current-value="{{ log.method }}">
+          <span class="tag tag-info">{{ log.get_method_display }}</span>
+          <button class="cell-detail-button" type="button" data-edit-trigger>查看详情</button>
+        </td>
+        <td class="clip detail-cell has-edit-trigger" data-edit-field="summary" data-current-value="{{ log.summary|default:'' }}">
+          {{ log.summary|truncatechars:80 }}
+          <button class="cell-detail-button" type="button" data-edit-trigger>查看详情</button>
+        </td>
+        <td class="clip detail-cell has-edit-trigger" data-edit-field="result" data-current-value="{{ log.result|default:'' }}">
+          {% if log.result %}{% for item in log.result|split_csv %}<span class="tag {{ item|status_tag_class }}">{{ item }}</span>{% endfor %}{% else %}<span class="muted">未填写</span>{% endif %}
+          <button class="cell-detail-button" type="button" data-edit-trigger>查看详情</button>
+        </td>
+        <td class="nowrap" data-edit-field="next_contact_at" data-current-value="{{ log.next_contact_at|date:'Y-m-d'|default:'' }}">{{ log.next_contact_at|date:"Y-m-d"|default:"未填写" }}</td>
+        <td class="nowrap detail-cell" data-detail-title="跟进照片"
+            data-detail-subtitle="{{ log.customer }} ｜ {{ log.contact_at|date:'Y-m-d H:i' }}"
+            {% if log.photo_file_url %}data-detail-image="{{ log.photo_file_url }}" data-detail-url="{{ log.photo_file_url }}"{% elif log.photo_note %}data-detail-body="{{ log.photo_note }}"{% else %}data-detail-body="未上传照片"{% endif %}
+            data-detail-edit-url="{% url 'contact_log_edit' log.pk %}"
+            data-detail-edit-label="上传照片">
+          {% if log.photo_file_url %}<span class="muted">{{ log.photo_file_name|default:"照片" }}</span>{% elif log.photo_note %}<span class="muted">照片说明</span>{% else %}<span class="muted">未上传</span>{% endif %}
+          <button class="cell-detail-button" type="button">查看详情</button>
+        </td>
+        <td class="nowrap detail-cell" data-detail-title="跟进音频"
+            data-detail-subtitle="{{ log.customer }} ｜ {{ log.contact_at|date:'Y-m-d H:i' }}"
+            {% if log.audio_file_url %}data-detail-audio="{{ log.audio_file_url }}" data-detail-url="{{ log.audio_file_url }}"{% else %}data-detail-body="未上传音频"{% endif %}
+            data-detail-edit-url="{% url 'contact_log_edit' log.pk %}"
+            data-detail-edit-label="上传音频">
+          {% if log.audio_file_url %}<span class="muted">音频</span>{% else %}<span class="muted">未上传</span>{% endif %}
+          <button class="cell-detail-button" type="button">查看详情</button>
+        </td>
+        <td class="nowrap">
+          <div class="action-cell">
+            <a class="button secondary" href="{% url 'contact_log_edit' log.pk %}">编辑</a>
+            <form method="post" action="{% url 'contact_log_delete' log.pk %}" onsubmit="return confirm('确认删除这条跟进日志？');">
+              {% csrf_token %}
+              <button class="button danger" type="submit">删除</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="11" class="muted">没有找到跟进日志。</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{{ inline_options|json_script:"contactLogInlineOptions" }}
+<script>
+  var logInlineOptions = JSON.parse(document.getElementById("contactLogInlineOptions").textContent);
+  var logInlineFieldLabels = {
+    contact_at: "跟进时间",
+    method: "跟进形式",
+    follower_name: "跟进人",
+    summary: "跟进内容",
+    result: "跟进结果",
+    next_contact_at: "下次联系时间"
+  };
+  var logInlineFieldTypes = {
+    contact_at: "datetime",
+    method: "select",
+    follower_name: "select",
+    summary: "textarea",
+    result: "multi",
+    next_contact_at: "date"
+  };
+  var activeLogInlineCell = null;
+  var logInlineModal = document.getElementById("logInlineEditModal");
+  var logInlineTitle = document.getElementById("logInlineEditTitle");
+  var logInlineSubtitle = document.getElementById("logInlineEditSubtitle");
+  var logInlineControl = document.getElementById("logInlineEditControl");
+  function csrfToken() {
+    var input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+    return input ? input.value : "";
+  }
+  function escapeHtml(value) {
+    return String(value || "").replace(/[&<>"']/g, function (char) {
+      return {"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"}[char];
+    });
+  }
+  function optionSelectHtml(field, value) {
+    var options = logInlineOptions[field] || [];
+    return '<select id="logInlineEditInput">' + options.map(function (item) {
+      var itemValue = String(typeof item === "string" ? item : item.value || "");
+      var label = String(typeof item === "string" ? item : item.label || "");
+      return '<option value="' + escapeHtml(itemValue) + '"' + (itemValue === value ? " selected" : "") + '>' + escapeHtml(label) + '</option>';
+    }).join("") + '</select>';
+  }
+  function multiCheckboxHtml(field, value) {
+    var options = logInlineOptions[field] || [];
+    var selected = {};
+    String(value || "").split(/[,，、;；\n]+/).forEach(function (item) { if (item.trim()) selected[item.trim()] = true; });
+    return '<div id="logInlineEditInput" class="inline-multi-options" data-multi-checkbox="1" role="group">' + options.map(function (item) {
+      var itemValue = String(typeof item === "string" ? item : item.value || "");
+      var label = String(typeof item === "string" ? item : item.label || "");
+      var checked = selected[itemValue] ? ' checked' : '';
+      return '<label class="inline-multi-option"><input type="checkbox" value="' + escapeHtml(itemValue) + '"' + checked + '><span>' + escapeHtml(label) + '</span></label>';
+    }).join("") + '</div>';
+  }
+  function inlineEditValue(input) {
+    if (input && input.dataset && input.dataset.multiCheckbox === "1") {
+      return Array.prototype.slice.call(input.querySelectorAll('input[type="checkbox"]:checked')).map(function (checkbox) {
+        return checkbox.value;
+      }).join(",");
+    }
+    return input ? input.value : "";
+  }
+  function openLogInlineEditor(cell) {
+    activeLogInlineCell = cell;
+    var field = cell.dataset.editField;
+    var value = cell.dataset.currentValue || "";
+    var type = logInlineFieldTypes[field] || "text";
+    logInlineTitle.textContent = logInlineFieldLabels[field] || "修改字段";
+    logInlineSubtitle.textContent = cell.closest("tr").dataset.recordLabel || "";
+    if (type === "select") {
+      logInlineControl.innerHTML = optionSelectHtml(field, value);
+    } else if (type === "multi") {
+      logInlineControl.innerHTML = multiCheckboxHtml(field, value);
+    } else if (type === "textarea") {
+      logInlineControl.innerHTML = '<textarea id="logInlineEditInput" rows="6">' + escapeHtml(value) + '</textarea>';
+    } else if (type === "date") {
+      logInlineControl.innerHTML = '<input id="logInlineEditInput" type="date" value="' + escapeHtml(value) + '">';
+    } else if (type === "datetime") {
+      logInlineControl.innerHTML = '<input id="logInlineEditInput" type="datetime-local" value="' + escapeHtml(value.replace(" ", "T")) + '">';
+    } else {
+      logInlineControl.innerHTML = '<input id="logInlineEditInput" value="' + escapeHtml(value) + '">';
+    }
+    logInlineModal.classList.add("open");
+    setTimeout(function () {
+      var input = document.getElementById("logInlineEditInput");
+      if (input) input.focus();
+    }, 0);
+  }
+  function closeLogInlineEditor() {
+    activeLogInlineCell = null;
+    logInlineModal.classList.remove("open");
+  }
+  document.querySelectorAll("[data-close-log-inline-modal]").forEach(function (button) {
+    button.addEventListener("click", closeLogInlineEditor);
+  });
+  logInlineModal.addEventListener("click", function (event) {
+    if (event.target === logInlineModal) closeLogInlineEditor();
+  });
+  document.querySelectorAll("[data-edit-trigger]").forEach(function (button) {
+    button.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      var cell = button.closest("[data-edit-field]");
+      if (cell) openLogInlineEditor(cell);
+    });
+  });
+  document.querySelectorAll("[data-edit-field]").forEach(function (cell) {
+    cell.addEventListener("click", function (event) {
+      if (event.target.closest("a, button, input, select, textarea")) return;
+      event.stopPropagation();
+      openLogInlineEditor(cell);
+    });
+  });
+  document.getElementById("saveLogInlineEdit").addEventListener("click", function () {
+    if (!activeLogInlineCell) return;
+    var input = document.getElementById("logInlineEditInput");
+    var row = activeLogInlineCell.closest("tr");
+    fetch(row.dataset.inlineUrl, {
+      method: "POST",
+      headers: {"Content-Type": "application/json", "X-CSRFToken": csrfToken()},
+      body: JSON.stringify({field: activeLogInlineCell.dataset.editField, value: inlineEditValue(input)})
+    }).then(function (response) {
+      return response.json().then(function (data) { return {ok: response.ok, data: data}; });
+    }).then(function (result) {
+      if (!result.ok || !result.data.ok) {
+        alert(result.data.error || "保存失败");
+        return;
+      }
+      window.location.reload();
+    }).catch(function () {
+      alert("保存失败，请稍后重试。");
+    });
+  });
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && logInlineModal.classList.contains("open")) closeLogInlineEditor();
+  });
+  document.querySelectorAll("[data-row-selectable]").forEach(function (row) {
+    row.addEventListener("click", function (event) {
+      if (event.target.closest("a, button, form, input, select, textarea, [data-detail-title]")) return;
+      document.querySelectorAll("[data-row-selectable]").forEach(function (item) {
+        item.classList.remove("selected-row");
+      });
+      row.classList.add("selected-row");
+    });
+  });
+</script>
+{% endblock %}

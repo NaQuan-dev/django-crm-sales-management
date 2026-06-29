@@ -1,0 +1,68 @@
+services:
+  db:
+    image: docker.m.daocloud.io/library/postgres:16-alpine
+    restart: unless-stopped
+    env_file: .env
+    networks:
+      - crm_net
+    volumes:
+      - crm_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  crm:
+    build: ./app
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - crm_net
+    ports:
+      - "8080:8000"
+    volumes:
+      - ./app:/app
+      - crm_static:/app/staticfiles
+      - crm_media:/app/media
+
+  rules:
+    build: ./app
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - crm_net
+    volumes:
+      - ./app:/app
+    command: ["python", "manage.py", "run_rules_loop"]
+
+  feishu_sync:
+    build: ./app
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - crm_net
+    volumes:
+      - ./app:/app
+    command: ["python", "manage.py", "run_feishu_sync_loop"]
+
+volumes:
+  crm_db:
+  crm_static:
+  crm_media:
+
+networks:
+  crm_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.10.0/24

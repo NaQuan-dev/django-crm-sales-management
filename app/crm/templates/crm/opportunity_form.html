@@ -1,0 +1,22 @@
+{% extends "crm/base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block heading %}{{ title }}{% endblock %}
+{% block content %}
+<form method="post" class="panel">
+  {% csrf_token %}
+  <div class="form-grid">
+    {% for field in form %}
+      <div class="form-row {% if field.name == 'description' %}full{% endif %}">
+        <label>{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}<div class="muted">{{ field.help_text }}</div>{% endif %}
+        {% for error in field.errors %}<div class="muted">{{ error }}</div>{% endfor %}
+      </div>
+    {% endfor %}
+  </div>
+  <div style="margin-top: 14px;">
+    <button type="submit">保存</button>
+    <a class="button secondary" href="{% url 'opportunity_list' %}">返回</a>
+  </div>
+</form>
+{% endblock %}

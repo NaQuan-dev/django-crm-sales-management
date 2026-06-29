@@ -1,0 +1,7 @@
+{% extends "crm/base.html" %}
+{% block title %}商机看板{% endblock %}
+{% block heading %}商机看板{% endblock %}
+{% block content %}
+<div class="toolbar"><a class="button" href="{% url 'opportunity_create' %}">新增商机</a><form method="get" class="toolbar"><input name="q" value="{{ q }}" placeholder="搜索编号、客户、进展"><select name="stage"><option value="">全部阶段</option>{% for value,label in stage_choices %}<option value="{{ value }}" {% if stage == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select><button type="submit">筛选</button></form></div>
+<section class="panel"><div class="kanban">{% for lane in lanes %}<div class="lane"><div class="lane-title"><span>{{ lane.stage }}</span><span class="muted">{{ lane.total }}</span></div><div class="mini-list">{% for opportunity in lane.items %}<div class="mini-item"><div class="mini-title"><a href="{% url 'customer_detail' opportunity.customer.pk %}">{{ opportunity.customer.display_name }}</a></div><div class="muted">{{ opportunity.owner|default:"未分配" }} ｜ {{ opportunity.expected_amount|floatformat:0 }} {{ opportunity.currency }} ｜ {{ opportunity.expected_close_month|default:"未定" }}</div><div class="muted">{{ opportunity.next_action|default:opportunity.latest_progress|truncatechars:60 }}</div><div class="mini-actions"><a class="text-link" href="{% url 'opportunity_edit' opportunity.pk %}">编辑</a></div></div>{% empty %}<div class="muted">暂无商机。</div>{% endfor %}</div></div>{% endfor %}</div></section>
+{% endblock %}

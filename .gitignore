@@ -1,0 +1,16 @@
+.env
+*.sqlite3
+db.sqlite3
+media/
+imports/
+staticfiles/
+logs/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.DS_Store
+*.log
+*.xlsx
+*.xls
+*.csv
+*.zip

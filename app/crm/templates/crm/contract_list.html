@@ -1,0 +1,246 @@
+{% extends "crm/base.html" %}
+{% block title %}合同管理{% endblock %}
+{% block heading %}合同管理{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <a class="button" href="{% url 'contract_create' %}">新增合同</a><a class="button secondary" href="{% url 'payment_create' %}">录入到款</a>
+</div>
+
+<form method="get" class="search-panel">
+  <div class="search-grid">
+    <div class="filter-field">
+      <label for="contract-q">关键词</label>
+      <input id="contract-q" name="q" value="{{ q }}" placeholder="搜索合同编号、客户编号、签约人员、备注">
+    </div>
+    <div class="filter-field">
+      <label for="contract-signer">签约人员</label>
+      <select id="contract-signer" name="signer">
+        <option value="">全部签约人员</option>
+        {% for item in signer_options %}
+          <option value="{{ item.value }}" {% if signer == item.value %}selected{% endif %}>{{ item.label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-field">
+      <label for="amount-min">合同金额</label>
+      <div style="display:grid; grid-template-columns: minmax(0,1fr) 20px minmax(0,1fr); gap:8px; align-items:center;">
+        <input id="amount-min" name="amount_min" value="{{ amount_min }}" type="number" min="0" step="0.01" placeholder="最小">
+        <span class="muted" style="text-align:center;">至</span>
+        <input name="amount_max" value="{{ amount_max }}" type="number" min="0" step="0.01" placeholder="最大">
+      </div>
+    </div>
+    <div class="filter-field">
+      <label for="signed-date">签约日期</label>
+      <input id="signed-date" name="signed_date" value="{{ signed_date }}" type="date">
+    </div>
+  </div>
+  <div class="search-actions">
+    <a class="button secondary" href="{% url 'contract_list' %}">清空</a>
+    <button type="submit">查询</button>
+  </div>
+</form>
+
+<div class="modal-backdrop" id="contractInlineEditModal">
+  <section class="modal">
+    <div class="modal-header">
+      <h2 id="contractInlineEditTitle">修改字段</h2>
+      <button class="button secondary" type="button" data-close-contract-inline-modal>关闭</button>
+    </div>
+    <div class="detail-body">
+      <div class="detail-subtitle" id="contractInlineEditSubtitle"></div>
+      <div id="contractInlineEditControl"></div>
+      <div class="muted">只有点击“确认保存”后才会写入。</div>
+    </div>
+    <div class="modal-actions">
+      <button class="button secondary" type="button" data-close-contract-inline-modal>取消</button>
+      <button type="button" id="saveContractInlineEdit">确认保存</button>
+    </div>
+  </section>
+</div>
+
+<div class="table-scroll">
+  <table class="contract-table compact-table">
+    <thead>
+      <tr>
+        <th>合同编号</th>
+        <th>关联客户编号</th>
+        <th>客户名称</th>
+        <th>签约人员</th>
+        <th>签约日期</th>
+        <th>合同金额</th>
+        <th>已收款</th>
+        <th>未收款</th>
+        <th>收款状态</th>
+        <th>合同附件</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for contract in contracts %}
+      <tr data-row-selectable data-inline-url="{% url 'contract_inline_update' contract.pk %}" data-record-label="{{ contract.contract_no }} ｜ {{ contract.customer|default:'未关联客户' }}">
+        <td class="nowrap">{{ contract.contract_no }}</td>
+        <td class="nowrap" data-edit-field="customer_id" data-current-value="{{ contract.customer_id|default:'' }}">{{ contract.customer.customer_no|default:"未关联" }}</td>
+        <td class="clip detail-cell has-edit-trigger" data-edit-field="customer_id" data-current-value="{{ contract.customer_id|default:'' }}">
+          {% if contract.customer %}
+            <a href="{% url 'customer_detail' contract.customer.pk %}">{{ contract.customer }}</a>
+          {% else %}
+            <span class="muted">未关联</span>
+          {% endif %}
+          <button class="cell-detail-button" type="button" data-edit-trigger>查看详情</button>
+        </td>
+        {% if can_assign_contracts %}
+          <td class="nowrap" data-edit-field="signed_by_id" data-current-value="{{ contract.signed_by_id|default:'' }}">{{ contract.signed_by_display|default:"未分配" }}</td>
+        {% else %}
+          <td class="nowrap">{{ contract.signed_by_display|default:"未分配" }}</td>
+        {% endif %}
+        <td class="nowrap" data-edit-field="signed_date" data-current-value="{{ contract.signed_date|date:'Y-m-d'|default:'' }}">{{ contract.signed_date|date:"Y-m-d"|default:"未填写" }}</td>
+        <td class="nowrap" data-edit-field="amount" data-current-value="{{ contract.amount|floatformat:2 }}">{{ contract.contract_amount|default:contract.amount|floatformat:2 }} {{ contract.currency }}</td>
+        <td class="nowrap">{{ contract.total_paid_amount|floatformat:2 }}</td>
+        <td class="nowrap"><span class="tag tag-warning">{{ contract.unpaid_amount|floatformat:2 }}</span></td>
+        <td class="nowrap">{{ contract.payment_status }}</td>
+        <td class="nowrap detail-cell" data-detail-title="合同附件"
+            data-detail-subtitle="{{ contract.contract_no }} ｜ {{ contract.customer|default:'未关联客户' }}"
+            {% if contract.attachment_file_url %}data-detail-url="{{ contract.attachment_file_url }}"{% elif contract.attachment_note %}data-detail-body="{{ contract.attachment_note }}"{% else %}data-detail-body="未上传合同附件"{% endif %}
+            data-detail-edit-url="{% url 'contract_edit' contract.pk %}"
+            data-detail-edit-label="上传附件">
+          {% if contract.attachment_file_url %}<span class="muted">{{ contract.attachment_file_name|default:"合同附件" }}</span>{% elif contract.attachment_note %}<span class="muted">附件说明</span>{% else %}<span class="muted">未上传</span>{% endif %}
+          <button class="cell-detail-button" type="button">查看详情</button>
+        </td>
+        <td class="nowrap">
+          <div class="action-cell">
+            <a class="button secondary" href="{% url 'contract_edit' contract.pk %}">编辑</a>
+            <a class="button secondary" href="{% url 'payment_create' %}?contract={{ contract.pk }}&customer={{ contract.customer_id }}">录入到款</a>
+            <form method="post" action="{% url 'contract_delete' contract.pk %}" onsubmit="return confirm('确认删除这份合同？删除后会进入最近删除。');">
+              {% csrf_token %}
+              <button class="button danger" type="submit">删除</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="11" class="muted">没有找到合同。</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{{ inline_options|json_script:"contractInlineOptions" }}
+<script>
+  var contractInlineOptions = JSON.parse(document.getElementById("contractInlineOptions").textContent);
+  var contractInlineFieldLabels = {
+    customer_id: "关联客户",
+    signed_by_id: "签约人员",
+    signed_date: "签约日期",
+    amount: "合同金额"
+  };
+  var contractInlineFieldTypes = {
+    customer_id: "select",
+    signed_by_id: "select",
+    signed_date: "date",
+    amount: "number"
+  };
+  var activeContractInlineCell = null;
+  var contractInlineModal = document.getElementById("contractInlineEditModal");
+  var contractInlineTitle = document.getElementById("contractInlineEditTitle");
+  var contractInlineSubtitle = document.getElementById("contractInlineEditSubtitle");
+  var contractInlineControl = document.getElementById("contractInlineEditControl");
+  function csrfToken() {
+    var input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+    return input ? input.value : "";
+  }
+  function escapeHtml(value) {
+    return String(value || "").replace(/[&<>"']/g, function (char) {
+      return {"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"}[char];
+    });
+  }
+  function optionSelectHtml(field, value) {
+    var options = contractInlineOptions[field] || [];
+    return '<select id="contractInlineEditInput">' + options.map(function (item) {
+      var itemValue = String(typeof item === "string" ? item : item.value || "");
+      var label = String(typeof item === "string" ? item : item.label || "");
+      return '<option value="' + escapeHtml(itemValue) + '"' + (itemValue === value ? " selected" : "") + '>' + escapeHtml(label) + '</option>';
+    }).join("") + '</select>';
+  }
+  function openContractInlineEditor(cell) {
+    activeContractInlineCell = cell;
+    var field = cell.dataset.editField;
+    var value = cell.dataset.currentValue || "";
+    var type = contractInlineFieldTypes[field] || "text";
+    contractInlineTitle.textContent = contractInlineFieldLabels[field] || "修改字段";
+    contractInlineSubtitle.textContent = cell.closest("tr").dataset.recordLabel || "";
+    if (type === "select") {
+      contractInlineControl.innerHTML = optionSelectHtml(field, value);
+    } else if (type === "textarea") {
+      contractInlineControl.innerHTML = '<textarea id="contractInlineEditInput" rows="6">' + escapeHtml(value) + '</textarea>';
+    } else if (type === "date") {
+      contractInlineControl.innerHTML = '<input id="contractInlineEditInput" type="date" value="' + escapeHtml(value) + '">';
+    } else if (type === "number") {
+      contractInlineControl.innerHTML = '<input id="contractInlineEditInput" type="number" min="0" step="0.01" value="' + escapeHtml(value) + '">';
+    } else {
+      contractInlineControl.innerHTML = '<input id="contractInlineEditInput" value="' + escapeHtml(value) + '">';
+    }
+    contractInlineModal.classList.add("open");
+    setTimeout(function () {
+      var input = document.getElementById("contractInlineEditInput");
+      if (input) input.focus();
+    }, 0);
+  }
+  function closeContractInlineEditor() {
+    activeContractInlineCell = null;
+    contractInlineModal.classList.remove("open");
+  }
+  document.querySelectorAll("[data-close-contract-inline-modal]").forEach(function (button) {
+    button.addEventListener("click", closeContractInlineEditor);
+  });
+  contractInlineModal.addEventListener("click", function (event) {
+    if (event.target === contractInlineModal) closeContractInlineEditor();
+  });
+  document.querySelectorAll("[data-edit-trigger]").forEach(function (button) {
+    button.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      var cell = button.closest("[data-edit-field]");
+      if (cell) openContractInlineEditor(cell);
+    });
+  });
+  document.querySelectorAll("[data-edit-field]").forEach(function (cell) {
+    cell.addEventListener("click", function (event) {
+      if (event.target.closest("a, button, input, select, textarea")) return;
+      event.stopPropagation();
+      openContractInlineEditor(cell);
+    });
+  });
+  document.getElementById("saveContractInlineEdit").addEventListener("click", function () {
+    if (!activeContractInlineCell) return;
+    var input = document.getElementById("contractInlineEditInput");
+    var row = activeContractInlineCell.closest("tr");
+    fetch(row.dataset.inlineUrl, {
+      method: "POST",
+      headers: {"Content-Type": "application/json", "X-CSRFToken": csrfToken()},
+      body: JSON.stringify({field: activeContractInlineCell.dataset.editField, value: input ? input.value : ""})
+    }).then(function (response) {
+      return response.json().then(function (data) { return {ok: response.ok, data: data}; });
+    }).then(function (result) {
+      if (!result.ok || !result.data.ok) {
+        alert(result.data.error || "保存失败");
+        return;
+      }
+      window.location.reload();
+    }).catch(function () {
+      alert("保存失败，请稍后重试。");
+    });
+  });
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && contractInlineModal.classList.contains("open")) closeContractInlineEditor();
+  });
+  document.querySelectorAll("[data-row-selectable]").forEach(function (row) {
+    row.addEventListener("click", function (event) {
+      if (event.target.closest("a, button, form, input, select, textarea, [data-detail-title]")) return;
+      document.querySelectorAll("[data-row-selectable]").forEach(function (item) {
+        item.classList.remove("selected-row");
+      });
+      row.classList.add("selected-row");
+    });
+  });
+</script>
+{% endblock %}

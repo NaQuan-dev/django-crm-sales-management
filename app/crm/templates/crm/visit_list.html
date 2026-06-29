@@ -1,0 +1,7 @@
+{% extends "crm/base.html" %}
+{% block title %}客户来访{% endblock %}
+{% block heading %}客户来访{% endblock %}
+{% block content %}
+<div class="toolbar"><a class="button" href="{% url 'visit_create' %}">新增来访</a><form method="get" class="toolbar"><select name="status"><option value="">全部状态</option>{% for value,label in status_choices %}<option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select><button type="submit">筛选</button></form></div>
+<table class="compact-table"><thead><tr><th>来访编号</th><th>客户</th><th>国家/地区</th><th>日期</th><th>到达时间</th><th>设备</th><th>接待人员</th><th>技术人员</th><th>准备</th><th>状态</th></tr></thead><tbody>{% for visit in visits %}<tr><td>{{ visit.visit_no }}</td><td><a href="{% url 'customer_detail' visit.customer.pk %}">{{ visit.customer.display_name }}</a></td><td>{{ visit.country_region }}</td><td>{{ visit.visit_date|date:"Y-m-d" }}</td><td>{{ visit.arrival_time|default:"待确认" }}</td><td>{{ visit.visit_equipment }}</td><td>{% for user in visit.reception_users.all %}<span class="tag">{{ user.get_full_name|default:user.username }}</span>{% endfor %}</td><td>{% for user in visit.technician_users.all %}<span class="tag">{{ user.get_full_name|default:user.username }}</span>{% endfor %}</td><td>{% if visit.need_car %}车 {% endif %}{% if visit.need_demo_machine %}设备 {% endif %}{% if visit.need_translator %}翻译{% endif %}</td><td>{{ visit.get_status_display }}</td></tr>{% empty %}<tr><td colspan="10" class="muted">暂无来访计划。</td></tr>{% endfor %}</tbody></table>
+{% endblock %}

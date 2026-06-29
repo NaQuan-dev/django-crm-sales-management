@@ -1,0 +1,83 @@
+{% extends "crm/base.html" %}
+
+{% block title %}导入客户资料预览{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <p class="eyebrow">客户资料导入</p>
+    <h1>导入预览与表头匹配</h1>
+  </div>
+  <a class="button secondary" href="{% url 'customer_list' %}">返回客户表</a>
+</div>
+
+<section class="detail-card import-preview-card">
+  <div class="detail-body">
+    <div class="scope-notice">
+      文件：{{ filename }}，共识别 {{ row_count }} 行数据，自动匹配 {{ matched_count }} 个字段。
+      {% if ignored_headers %}未匹配表头：{{ ignored_headers|join:"、" }}。{% endif %}
+    </div>
+    <form method="post" action="{% url 'customer_import_confirm' %}">
+      {% csrf_token %}
+      <div class="form-grid import-options">
+        <div class="form-row">
+          <label for="duplicate-mode">重复资料</label>
+          <select id="duplicate-mode" name="duplicate_mode">
+            <option value="merge" {% if duplicate_mode == "merge" %}selected{% endif %}>合并资料到原客户</option>
+            <option value="skip" {% if duplicate_mode == "skip" %}selected{% endif %}>取消本次新增</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="overwrite-import">覆盖已有字段</label>
+          <select id="overwrite-import" name="overwrite">
+            <option value="" {% if not overwrite %}selected{% endif %}>不覆盖，只补空白</option>
+            <option value="1" {% if overwrite %}selected{% endif %}>覆盖已有内容</option>
+          </select>
+        </div>
+      </div>
+
+      <h2 class="section-title">字段匹配</h2>
+      <div class="import-map-grid">
+        {% for spec in field_specs %}
+        <label class="import-map-item">
+          <span>{{ spec.label }}</span>
+          <select name="map_{{ spec.field }}">
+            <option value="">不导入</option>
+            {% for header in headers %}
+            <option value="{{ header }}" {% if header == spec.selected %}selected{% endif %}>{{ header }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        {% endfor %}
+      </div>
+
+      <h2 class="section-title">数据预览</h2>
+      <div class="table-wrap import-preview-wrap">
+        <table class="data-table import-preview-table">
+          <thead>
+            <tr>
+              {% for header in headers %}<th>{{ header }}</th>{% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in preview_rows %}
+            <tr>
+              {% for cell in row.cells %}<td>{{ cell|default:"" }}</td>{% endfor %}
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="{{ headers|length }}">没有可预览的数据。</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="form-actions sticky-actions">
+        <a class="button secondary" href="{% url 'customer_list' %}">取消</a>
+        <button type="submit">确认导入</button>
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}

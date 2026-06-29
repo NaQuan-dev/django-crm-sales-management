@@ -1,0 +1,31 @@
+{% extends "crm/base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block heading %}{{ title }}{% endblock %}
+{% block content %}
+<section class="panel form-shell">
+  <div class="section-title">
+    <h2>{{ title }}</h2>
+    <a class="button secondary" href="{% if customer %}{% url 'customer_detail' customer.pk %}{% else %}{% url 'customer_list' %}{% endif %}">返回</a>
+  </div>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="form-grid">
+      {% for field in form %}
+        <div class="form-row {% if field.name == 'notes' or field.name == 'attachment_note' or field.name == 'demand' or field.name == 'customer_status_text' %}full{% endif %}">
+          <label>{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}<div class="muted">{{ field.help_text }}</div>{% endif %}
+          {% for error in field.errors %}<div class="muted">{{ error }}</div>{% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+    <div class="inline-form-actions">
+      <button type="submit">保存</button>
+      <a class="button secondary" href="{% if customer %}{% url 'customer_detail' customer.pk %}{% else %}{% url 'customer_list' %}{% endif %}">取消</a>
+      {% if customer %}
+        <button class="button danger" type="submit" formaction="{% url 'customer_delete' customer.pk %}" formmethod="post" onclick="return confirm('确认删除客户「{{ customer }}」？删除后会进入最近删除。');">删除</button>
+      {% endif %}
+    </div>
+  </form>
+</section>
+{% endblock %}

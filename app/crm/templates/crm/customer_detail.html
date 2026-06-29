@@ -1,0 +1,166 @@
+{% extends "crm/base.html" %}
+{% load crm_extras %}
+{% block title %}{{ customer.display_name }}{% endblock %}
+{% block heading %}{{ customer.display_name }}{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="section-title">
+    <div>
+      <h2>{{ customer.customer_no }}</h2>
+      <div class="muted">{{ customer.nickname|default:customer.name|default:"未命名客户" }}</div>
+    </div>
+    <div class="action-cell">
+      <a class="button" href="{% url 'customer_edit' customer.pk %}">编辑客户</a>
+      <a class="button secondary" href="{% url 'quote_create' %}?customer={{ customer.pk }}">新增报价</a>
+      <a class="button secondary" href="{% url 'payment_create' %}?customer={{ customer.pk }}">录入到款</a>
+      {% if user.is_staff %}<a class="button secondary" href="{% url 'customer_transfer' customer.pk %}">转移</a><a class="button secondary" href="{% url 'customer_merge' customer.pk %}">合并</a>{% endif %}
+      {% if customer.is_recycled %}
+        <form method="post" action="{% url 'customer_recycle_restore' customer.pk %}">{% csrf_token %}<button type="submit">恢复客户</button></form>
+      {% else %}
+        <form method="post" action="{% url 'customer_mark_invalid' customer.pk %}" onsubmit="return confirm('确认标记为无效并进入回收站？');">{% csrf_token %}<button class="button danger" type="submit">标记无效</button></form>
+      {% endif %}
+    </div>
+  </div>
+  <div class="card-grid">
+    <div class="info-card"><div class="info-label">客户编号</div><div class="info-value">{{ customer.customer_no }}</div></div>
+    <div class="info-card"><div class="info-label">昵称/网名</div><div class="info-value">{{ customer.nickname|default:"未填写" }}</div></div>
+    <div class="info-card"><div class="info-label">正式名称</div><div class="info-value" data-edit-field="official_name" data-current-value="{{ customer.official_name|default:customer.name|default:'' }}" data-inline-url="{% url 'customer_inline_update' customer.pk %}" tabindex="0" role="button" aria-label="点击编辑正式名称">{{ customer.official_name|default:customer.name|default:"未填写" }}</div></div>
+    <div class="info-card"><div class="info-label">负责人</div><div class="info-value">{{ customer.owner_display|default:"未分配" }}</div></div>
+    <div class="info-card"><div class="info-label">协作业务员</div><div class="info-value">{% for user in customer.co_owners.all %}<span class="tag">{{ user.get_full_name|default:user.username }}</span>{% empty %}<span class="muted">无</span>{% endfor %}</div></div>
+    <div class="info-card"><div class="info-label">来源渠道</div><div class="info-value">{{ customer.source_channel|default:"未填写" }}</div></div>
+    <div class="info-card"><div class="info-label">国家/地区</div><div class="info-value">{{ customer.country_region|default:customer.location_display|default:"未填写" }}</div></div>
+    <div class="info-card"><div class="info-label">语言</div><div class="info-value">{{ customer.language|default:"未填写" }}</div></div>
+    <div class="info-card"><div class="info-label">关注产品</div><div class="info-value">{{ customer.product_interest|default:customer.demand|default:"未填写" }}</div></div>
+    <div class="info-card"><div class="info-label">最新需求</div><div class="info-value">{{ customer.demand_summary|default:customer.notes|truncatechars:80|default:"未填写" }}</div></div>
+    <div class="info-card"><div class="info-label">最后联系时间</div><div class="info-value">{{ customer.last_contact_at|date:"Y-m-d H:i"|default:"未联系" }}</div></div>
+    <div class="info-card"><div class="info-label">未联系天数</div><div class="info-value">{{ customer.uncontacted_days|default_if_none:"未计算" }}</div></div>
+    <div class="info-card"><div class="info-label">下一步动作</div><div class="info-value">{{ customer.next_action|default:"待补充" }}</div></div>
+    <div class="info-card"><div class="info-label">合同状态</div><div class="info-value">{{ summary.contract_status }}</div></div>
+  </div>
+</section>
+
+<div class="modal-backdrop" id="detailInlineEditModal">
+  <section class="modal">
+    <div class="modal-header">
+      <h2 id="detailInlineEditTitle">修改字段</h2>
+      <button class="button secondary" type="button" data-close-detail-inline-modal>关闭</button>
+    </div>
+    <div class="detail-body">
+      <div class="detail-subtitle" id="detailInlineEditSubtitle"></div>
+      <input id="detailInlineEditInput" value="">
+    </div>
+    <div class="modal-actions">
+      <button class="button secondary" type="button" data-close-detail-inline-modal>取消</button>
+      <button type="button" id="saveDetailInlineEdit">确认保存</button>
+    </div>
+  </section>
+</div>
+
+<div class="toolbar" style="margin-top:14px;">
+  <a class="button secondary" href="#info">客户信息</a><a class="button secondary" href="#logs">联系记录</a><a class="button secondary" href="#quotes">报价信息</a><a class="button secondary" href="#contracts">销售合同</a><a class="button secondary" href="#payments">到款记录</a><a class="button secondary" href="#operations">操作日志</a><a class="button secondary" href="#reminders">提醒记录</a>
+</div>
+
+<section id="info" class="panel" style="margin-top:14px;">
+  <div class="section-title"><h2>客户信息</h2></div>
+  <div class="split-grid">
+    <div>
+      <table class="compact-table"><tbody>
+        <tr><th>主联系人</th><td>{{ customer.main_contact_name|default:customer.contact_name|default:"未填写" }}</td></tr>
+        <tr><th>电话</th><td>{{ customer.phone|default:"未填写" }}</td></tr>
+        <tr><th>微信</th><td>{{ customer.wechat|default:"未填写" }}</td></tr>
+        <tr><th>WhatsApp</th><td>{{ customer.whatsapp|default:"未填写" }}</td></tr>
+        <tr><th>邮箱</th><td>{{ customer.email|default:"未填写" }}</td></tr>
+        <tr><th>外贸账号</th><td>{{ customer.platform_account|default:"未填写" }}</td></tr>
+      </tbody></table>
+    </div>
+    <div>
+      <h2>联系人</h2>
+      <table class="compact-table"><thead><tr><th>姓名</th><th>职位</th><th>电话</th><th>微信/WhatsApp</th><th>主联系人</th></tr></thead><tbody>{% for contact in contacts %}<tr><td>{{ contact.name }}</td><td>{{ contact.position }}</td><td>{{ contact.phone }}</td><td>{{ contact.wechat }} {{ contact.whatsapp }}</td><td>{% if contact.is_primary %}是{% endif %}</td></tr>{% empty %}<tr><td colspan="5" class="muted">暂无联系人。</td></tr>{% endfor %}</tbody></table>
+    </div>
+  </div>
+</section>
+
+<section id="logs" class="split-grid" style="margin-top:14px;">
+  <div class="panel">
+    <div class="section-title"><h2>新增联系记录</h2></div>
+    <form method="post" enctype="multipart/form-data">{% csrf_token %}<div class="form-grid">{% for field in form %}<div class="form-row {% if field.name == 'summary' or field.name == 'content' or field.name == 'demand_update' or field.name == 'customer_feedback' or field.name == 'attachments' %}full{% endif %}"><label>{{ field.label }}</label>{{ field }}{% for error in field.errors %}<div class="muted">{{ error }}</div>{% endfor %}</div>{% endfor %}</div><div class="inline-form-actions"><button type="submit">保存联系记录</button></div></form>
+  </div>
+  <div class="panel">
+    <div class="section-title"><h2>联系记录时间线</h2></div>
+    <div class="timeline">{% for log in logs %}<div class="timeline-item"><strong>{{ log.contact_at|date:"Y-m-d H:i" }} ｜ {{ log.get_method_display }} ｜ {{ log.follower_name|default:log.followed_by|default:"" }}</strong><p>{{ log.content|default:log.summary }}</p>{% if log.demand_update %}<p class="muted">需求：{{ log.demand_update }}</p>{% endif %}{% if log.quote_update %}<p class="muted">报价：{{ log.quote_update }}</p>{% endif %}{% if log.next_action %}<p class="muted">下一步：{{ log.next_action }}</p>{% endif %}{% if log.next_contact_at %}<p class="muted">下次联系：{{ log.next_contact_at|date:"Y-m-d" }}</p>{% endif %}</div>{% empty %}<p class="muted">暂无联系记录。</p>{% endfor %}</div>
+  </div>
+</section>
+
+<section id="quotes" class="panel" style="margin-top:14px;">
+  <div class="section-title"><h2>报价信息</h2><a class="button secondary" href="{% url 'quote_create' %}?customer={{ customer.pk }}">新增报价</a></div>
+  <table class="compact-table"><thead><tr><th>编号</th><th>日期</th><th>报价人</th><th>状态</th><th>金额</th><th>方案</th><th>附件</th></tr></thead><tbody>{% for quote in quotes %}<tr><td><a href="{% url 'quote_edit' quote.pk %}">{{ quote.quote_no }}</a></td><td>{{ quote.quote_date|date:"Y-m-d" }}</td><td>{{ quote.quoted_by|default:"未分配" }}</td><td>{{ quote.get_status_display }}</td><td>{{ quote.total_amount|floatformat:2 }} {{ quote.currency }}</td><td>{% for plan in quote.plans.all %}<span class="tag">{{ plan.plan_name }} {{ plan.equipment_model }}</span>{% empty %}<span class="muted">未录方案</span>{% endfor %}</td><td>{% if quote.attachment_url %}<a href="{{ quote.attachment_url }}">报价单</a>{% endif %}</td></tr>{% empty %}<tr><td colspan="7" class="muted">暂无报价。</td></tr>{% endfor %}</tbody></table>
+</section>
+
+<section id="contracts" class="panel" style="margin-top:14px;"><div class="section-title"><h2>销售合同</h2><a class="button secondary" href="{% url 'contract_create' %}">新增合同</a></div><table class="compact-table"><thead><tr><th>合同编号</th><th>签约日期</th><th>负责人</th><th>金额</th><th>状态</th><th>已收款</th><th>未收款</th></tr></thead><tbody>{% for contract in contracts %}<tr><td>{{ contract.contract_no }}</td><td>{{ contract.signed_date|date:"Y-m-d"|default:"未填写" }}</td><td>{{ contract.sales_user|default:contract.signed_by_display }}</td><td>{{ contract.contract_amount|floatformat:2 }} {{ contract.currency }}</td><td>{{ contract.get_status_display }}</td><td>{{ contract.total_paid_amount|floatformat:2 }}</td><td>{{ contract.unpaid_amount|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="7" class="muted">暂无合同。</td></tr>{% endfor %}</tbody></table></section>
+
+<section id="payments" class="panel" style="margin-top:14px;"><div class="section-title"><h2>到款记录</h2><a class="button secondary" href="{% url 'payment_create' %}?customer={{ customer.pk }}">录入到款</a></div><table class="compact-table"><thead><tr><th>编号</th><th>合同</th><th>节点</th><th>日期</th><th>应收</th><th>手续费</th><th>实收</th></tr></thead><tbody>{% for payment in payments %}<tr><td>{{ payment.payment_no }}</td><td>{{ payment.contract.contract_no }}</td><td>{{ payment.get_payment_stage_display }}</td><td>{{ payment.payment_date|date:"Y-m-d" }}</td><td>{{ payment.amount|floatformat:2 }} {{ payment.currency }}</td><td>{{ payment.bank_fee|floatformat:2 }}</td><td>{{ payment.actual_received_amount|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="7" class="muted">暂无到款记录。</td></tr>{% endfor %}</tbody></table></section>
+
+<section id="operations" class="panel" style="margin-top:14px;"><div class="section-title"><h2>操作日志</h2></div><table class="compact-table"><thead><tr><th>时间</th><th>操作人</th><th>动作</th><th>备注</th></tr></thead><tbody>{% for item in operation_logs %}<tr><td>{{ item.created_at|date:"Y-m-d H:i" }}</td><td>{{ item.user|default:"系统" }}</td><td>{{ item.get_action_type_display }}</td><td>{{ item.remark }}</td></tr>{% empty %}<tr><td colspan="4" class="muted">暂无操作日志。</td></tr>{% endfor %}</tbody></table></section>
+
+<section id="reminders" class="panel" style="margin-top:14px;"><div class="section-title"><h2>提醒记录</h2></div><table class="compact-table"><thead><tr><th>时间</th><th>类型</th><th>负责人</th><th>标题</th><th>状态</th><th>优先级</th></tr></thead><tbody>{% for task in task_reminders %}<tr><td>{{ task.due_at|date:"Y-m-d H:i" }}</td><td>{{ task.get_reminder_type_display }}</td><td>{{ task.assigned_to|default:"未分配" }}</td><td>{{ task.title }}</td><td>{{ task.get_status_display }}</td><td>{{ task.get_priority_display }}</td></tr>{% empty %}<tr><td colspan="6" class="muted">暂无提醒。</td></tr>{% endfor %}</tbody></table></section>
+
+<script id="detailInlineScript">
+(function () {
+  var editable = document.querySelector('.info-value[data-edit-field="official_name"]');
+  var modal = document.getElementById("detailInlineEditModal");
+  var input = document.getElementById("detailInlineEditInput");
+  var title = document.getElementById("detailInlineEditTitle");
+  var subtitle = document.getElementById("detailInlineEditSubtitle");
+  var save = document.getElementById("saveDetailInlineEdit");
+  if (!editable || !modal || !input || !save) return;
+  function csrfToken() {
+    var csrfInput = document.querySelector('input[name="csrfmiddlewaretoken"]');
+    return csrfInput ? csrfInput.value : "";
+  }
+  function openEditor() {
+    title.textContent = "修改正式名称";
+    subtitle.textContent = "{{ customer.customer_no|escapejs }} ｜ {{ customer.display_name|escapejs }}";
+    input.value = editable.dataset.currentValue || "";
+    modal.classList.add("open");
+    setTimeout(function () { input.focus(); input.select(); }, 0);
+  }
+  function closeEditor() {
+    modal.classList.remove("open");
+  }
+  editable.addEventListener("click", openEditor);
+  editable.addEventListener("keydown", function (event) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openEditor();
+    }
+  });
+  document.querySelectorAll("[data-close-detail-inline-modal]").forEach(function (button) {
+    button.addEventListener("click", closeEditor);
+  });
+  modal.addEventListener("click", function (event) {
+    if (event.target === modal) closeEditor();
+  });
+  input.addEventListener("keydown", function (event) {
+    if (event.key === "Enter") save.click();
+    if (event.key === "Escape") closeEditor();
+  });
+  save.addEventListener("click", function () {
+    fetch(editable.dataset.inlineUrl, {
+      method: "POST",
+      headers: {"Content-Type": "application/json", "X-CSRFToken": csrfToken()},
+      body: JSON.stringify({field: editable.dataset.editField, value: input.value})
+    }).then(function (response) {
+      return response.json().then(function (data) { return {ok: response.ok, data: data}; });
+    }).then(function (result) {
+      if (!result.ok || !result.data.ok) {
+        alert(result.data.error || "保存失败");
+        return;
+      }
+      window.location.reload();
+    }).catch(function () {
+      alert("保存失败，请稍后重试。");
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "crm/base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block heading %}{{ title }}{% endblock %}
+{% block content %}
+<section class="panel form-shell"><form method="post" enctype="multipart/form-data">{% csrf_token %}<div class="form-grid">{% for field in form %}<div class="form-row {% if field.name == 'remark' %}full{% endif %}"><label>{{ field.label }}</label>{{ field }}{% for error in field.errors %}<div class="muted">{{ error }}</div>{% endfor %}</div>{% endfor %}</div><div class="inline-form-actions"><button type="submit">保存报价</button><a class="button secondary" href="{% url 'quote_list' %}">返回</a></div></form></section>
+{% if quote %}
+<section class="split-grid" style="margin-top:14px;">
+  <div class="panel"><div class="section-title"><h2>报价方案</h2></div><table class="compact-table"><thead><tr><th>方案</th><th>型号</th><th>产能</th><th>罐型</th><th>单价</th><th>数量</th><th>小计</th></tr></thead><tbody>{% for plan in plans %}<tr><td>{{ plan.plan_name }}</td><td>{{ plan.equipment_model }}</td><td>{{ plan.capacity }}</td><td>{{ plan.can_type }}</td><td>{{ plan.price|floatformat:2 }}</td><td>{{ plan.quantity }}</td><td>{{ plan.subtotal|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="7" class="muted">暂无方案。</td></tr>{% endfor %}</tbody></table></div>
+  <div class="panel"><div class="section-title"><h2>新增方案</h2></div><form method="post">{% csrf_token %}<input type="hidden" name="form_kind" value="plan"><div class="form-grid">{% for field in plan_form %}{% if field.name != 'quote' %}<div class="form-row {% if field.name == 'main_machine_config' or field.name == 'remark' %}full{% endif %}"><label>{{ field.label }}</label>{{ field }}</div>{% endif %}{% endfor %}</div><div class="inline-form-actions"><button type="submit">保存方案</button></div></form></div>
+</section>
+{% endif %}
+{% endblock %}

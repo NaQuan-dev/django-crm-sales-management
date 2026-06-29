@@ -1,86 +1,62 @@
-# 业务规则
+# Business Rules Template
 
-## 客户标签
+> Template only. Adjust the rules for your real sales process before production use.
 
-第一版标签由本地规则生成，不调用外部 AI。系统会根据来源、需求、备注自动增加标签，例如：
+## Customer Tags
 
-- 短视频
-- 网站询盘
-- 展会
-- 转介绍
-- 设备咨询
-- 价格敏感
-- 近期意向
-- 海外客户
-- 联系信息不足
-- 疑似无效
+The default version uses local rule-based tagging and does not call external AI services. Tags can be generated from source, demand, notes, and contact quality. Example tags include:
 
-后续如果 NAS 性能够用，可以接 Ollama，把标签从规则引擎升级为本地大模型。
+- Short-video lead
+- Website inquiry
+- Exhibition lead
+- Referral
+- Equipment inquiry
+- Price sensitive
+- Near-term intent
+- Overseas customer
+- Missing contact details
+- Possibly invalid
 
-## 沟通记录
+If the deployment environment supports it, this can later be upgraded to a local model such as Ollama.
 
-每个客户下可以连续追加沟通记录，字段包括：
+## Follow-up Logs
 
-- 沟通时间
-- 沟通方式
-- 沟通摘要
-- 沟通结果
-- 下次联系时间
+Each customer can have multiple follow-up logs. Core fields include contact time, channel, summary, result, next action, and next follow-up time.
 
-如果销售没有手动填写下次联系时间，系统会按客户级别自动建议。
+If the next follow-up time is empty, the system can suggest one based on the customer level.
 
-## 下次联系规则
+## Next Follow-up Defaults
 
-默认规则：
+| Customer level | Suggested next contact |
+| --- | --- |
+| Key account | 3 days |
+| Interested | 7 days |
+| Normal | 14 days |
+| Potential | 21 days |
+| Nurture | 30 days |
+| Unknown | 14 days |
+| Closed-won | 30 days |
+| Invalid | No reminder |
 
-| 客户级别 | 下次联系 |
-|---|---:|
-| 重点 | 3 天 |
-| 意向 | 7 天 |
-| 一般 | 14 天 |
-| 潜在 | 21 天 |
-| 待孵化 | 30 天 |
-| 待定 | 14 天 |
-| 成交 | 30 天 |
-| 无效 | 不提醒 |
+## Public Pool Rules
 
-## 公海规则
+Default template rule:
 
-默认规则：
+1. Customers without follow-up activity for 30 days generate a reminder for the current owner.
+2. If there is still no new follow-up after the grace period, the customer enters the public pool.
+3. Public-pool customers keep their historical records and can be claimed or reassigned.
 
-1. 客户超过 30 天没有沟通记录，系统先提醒当前负责人。
-2. 提醒后 24 小时仍没有新增沟通记录，客户自动进入公海。
-3. 进入公海后，客户负责人清空，销售可以重新领取或由领导分配。
+Configurable environment variables:
 
-这两个时间可以在 `.env` 调整：
-
-```text
+```env
 CRM_PUBLIC_POOL_DAYS=30
 CRM_PUBLIC_POOL_GRACE_HOURS=24
 ```
 
-## 权限规则
+## Roles
 
-销售：
-
-- 可以新增线索和客户。
-- 可以编辑自己负责的客户和线索。
-- 可以给客户追加沟通记录。
-- 可以查看公海客户。
-- 没有删除入口。
-
-新媒体：
-
-- 主要用于快速录入线索。
-- 可以编辑线索基础信息。
-
-领导：
-
-- 可以查看全部客户和线索。
-- 可以分配负责人。
-- 可以查看提醒和公海情况。
-
-管理员：
-
-- 管理账号、角色、系统配置。
-- 原则上只做系统维护，不参与日常客户删除。
+- Administrator: system maintenance and full access.
+- Sales leader: view all records, assign owners, review workload and public-pool status.
+- Salesperson: manage owned/co-owned customers, create follow-ups, quotes, and reminders.
+- Finance: contract/payment views and payment confirmation.
+- Technician: sample/testing and visit-related work where enabled.

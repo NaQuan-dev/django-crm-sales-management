@@ -1,7 +1,7 @@
 {% extends "admin/base.html" %}
 {% load i18n static %}
 
-{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | 客户系统管理{% endblock %}
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | CRM Template Admin{% endblock %}
 
 {% block extrastyle %}{{ block.super }}
 <style>
@@ -36,6 +36,7 @@
     font-size: 13px;
   }
   .nq-admin-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .nq-template-notice { display: inline-flex; align-items: center; min-height: 30px; padding: 0 10px; border: 1px solid #fedf89; border-radius: 6px; background: #fffaeb; color: #93370d; font-weight: 700; }
   .nq-admin-actions a,
   #user-tools a.nq-admin-home-link {
     display: inline-flex;
@@ -90,17 +91,18 @@
 
 {% block branding %}
 <div class="nq-admin-logo" aria-hidden="true">CRM</div>
-<div id="site-name"><a href="{% url 'admin:index' %}">客户系统管理</a></div>
+<div id="site-name"><a href="{% url 'admin:index' %}">CRM Template Admin</a></div>
 {% if user.is_anonymous %}
   {% include "admin/color_theme_toggle.html" %}
 {% endif %}
 {% endblock %}
 
 {% block nav-global %}
-<nav class="nq-admin-actions" aria-label="后台快捷入口">
-  <a class="primary" href="{% url 'dashboard' %}">返回客户系统</a>
-  <a href="{% url 'customer_list' %}">客户总表</a>
-  <a href="{% url 'contact_log_list' %}">跟进日志</a>
-  <a href="{% url 'contract_list' %}">合同管理</a>
+<nav class="nq-admin-actions" aria-label="Admin shortcuts">
+  <span class="nq-template-notice">Template only - review before production use</span>
+  <a class="primary" href="{% url 'dashboard' %}">Back to CRM</a>
+  <a href="{% url 'customer_list' %}">Customers</a>
+  <a href="{% url 'contact_log_list' %}">Follow-up Logs</a>
+  <a href="{% url 'contract_list' %}">Contracts</a>
 </nav>
 {% endblock %}

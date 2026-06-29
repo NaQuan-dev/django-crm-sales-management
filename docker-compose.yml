@@ -1,3 +1,6 @@
+# TEMPLATE ONLY.
+# Review secrets, domains, storage, backups, and network settings before production use.
+
 services:
   db:
     image: docker.m.daocloud.io/library/postgres:16-alpine

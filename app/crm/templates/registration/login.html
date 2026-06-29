@@ -1,10 +1,10 @@
 {% load static %}
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>登录销售客户系统</title>
+  <title>Sign in to Sales CRM Template</title>
   <style>
     :root {
       --bg: #f5f7fa;
@@ -49,6 +49,7 @@
     button:hover { background: var(--primary-dark); }
     .error { color: var(--bad); background: #fff1f0; border: 1px solid #fecdca; border-radius: 6px; padding: 9px 10px; }
     .muted { color: var(--muted); }
+    .template-notice { margin: 0 0 14px; padding: 10px 12px; border: 1px solid #fedf89; border-radius: 6px; background: #fffaeb; color: #93370d; font-size: 13px; line-height: 1.4; }
     @media (max-width: 820px) {
       .wrap { grid-template-columns: 1fr; }
       .hero { min-height: 180px; }
@@ -61,22 +62,22 @@
       <div class="brand">
         <div class="brand-logo-box"><span class="brand-logo-text">CRM</span></div>
         <div>
-          <div class="brand-title">销售客户系统</div>
-          <div class="brand-subtitle">客户管理系统</div>
+          <div class="brand-title">Sales CRM Template</div>
+          <div class="brand-subtitle">Sanitized public template</div>
         </div>
       </div>
     </section>
     <section class="login-side">
       <form class="panel" method="post">
         {% csrf_token %}
-        <h1>登录</h1>
-        <p class="muted">使用系统分配的销售或管理员账号登录。</p>
-        {% if form.errors %}<p class="error">账号或密码不正确。</p>{% endif %}
-        <label for="{{ form.username.id_for_label }}">账号</label>
+        <h1>Sign in</h1>
+        <p class="template-notice"><strong>Template only.</strong> Do not connect production data or credentials until the deployment has been reviewed.</p><p class="muted">Use the configured sales or administrator account.</p>
+        {% if form.errors %}<p class="error">Invalid username or password.</p>{% endif %}
+        <label for="{{ form.username.id_for_label }}">Username</label>
         {{ form.username }}
-        <label for="{{ form.password.id_for_label }}">密码</label>
+        <label for="{{ form.password.id_for_label }}">Password</label>
         {{ form.password }}
-        <button type="submit">登录</button>
+        <button type="submit">Sign in</button>
       </form>
     </section>
   </div>

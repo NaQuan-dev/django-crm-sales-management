@@ -1,39 +1,55 @@
-# Django CRM Sales Management
+# Django CRM Sales Management Template
 
-这是一个脱敏后的 Django CRM 示例项目，用于客户资料、跟进记录、报价、合同收款、公海/回收站和经营看板管理。
+> **Template only.** This repository is a sanitized public template. It is not a production backup and must not be connected to production data, credentials, Feishu/Lark apps, or customer files without a security review.
 
-公开仓库不包含生产数据库、导入文件、媒体附件、日志、真实账号、真实客户资料或生产环境变量。
+This Django CRM template covers customer records, follow-up logs, quotations, contracts/payments, public-pool/recycle-bin workflows, reminders, and sales dashboard views.
 
-## 本地运行
+The public repository intentionally excludes production databases, import workbooks, uploaded media, logs, real staff accounts, real customer data, deployment keys, and `.env` files.
 
-1. 复制环境变量模板：
+## Local Setup
+
+1. Copy the environment template:
 
    ```bash
    cp env.example .env
    ```
 
-2. 修改 `.env` 中的密钥、数据库密码和域名。
+2. Replace every placeholder in `.env`, especially secret keys, database passwords, host names, admin credentials, and Feishu/Lark credentials.
 
-3. 使用 Docker 启动：
+3. Start the template stack with Docker:
 
    ```bash
    docker compose up -d --build
    ```
 
-4. 进入应用容器执行数据库迁移：
+4. Run migrations and create an administrator if you are not using the container entrypoint:
 
    ```bash
    python manage.py migrate
    python manage.py createsuperuser
    ```
 
-## 目录说明
+## Template Safety Notes
 
-- `app/`：Django 项目代码。
-- `docs/`：业务规则和迁移说明。
-- `env.example`：环境变量示例，不包含生产密钥。
-- `docker-compose.yml`：本地或服务器部署示例。
+- `env.example` and `.env.example` are templates only. Never deploy them as-is.
+- `docker-compose.yml` is a development/template compose file. Review domains, storage, network settings, backups, and secrets before production use.
+- `CRM_TEMPLATE_RUN_DATA_REPAIR=0` by default. Historical repair/import commands are disabled unless you intentionally enable them.
+- Feishu/Lark synchronization is disabled until real credentials and `FEISHU_SYNC_SOURCES_JSON` are provided.
+- Do not commit `.env`, databases, import files, uploaded media, logs, or generated archives.
 
-## 注意
+## Directory Layout
 
-飞书同步、客户导入和外部系统对接需要在部署环境中单独配置真实凭证。不要把 `.env`、数据库、导入文件、附件目录提交到仓库。
+- `app/`: Django project code.
+- `docs/`: English template documentation.
+- `env.example`: placeholder environment variables.
+- `docker-compose.yml`: local/template deployment example.
+- `TEMPLATE_NOTICE.md`: short reminder that this is a sanitized template.
+
+## Verification
+
+The sanitized template was checked with:
+
+```bash
+python manage.py check
+python manage.py test crm.tests --noinput
+```

@@ -1,52 +1,55 @@
-# 销售使用流程
+# Sales Workflow Template
 
-## 每天新增线索
+> Template only. Adapt this workflow to the real sales organization before production use.
 
-进入 `线索快录`，优先填写：
+## Add New Inquiries
 
-- 客户名称或昵称
-- 电话或微信
-- 来源渠道
-- 客户类型
-- 客户需求
-- 备注
+Open the intake/customer form and prioritize:
 
-没有的信息可以先留空，后续再补。
+- Customer name or nickname
+- Phone, WeChat, WhatsApp, or email
+- Source channel
+- Customer type
+- Product demand
+- Notes
 
-## 新线索变成客户
+Unknown information can be left empty and completed later.
 
-第一版先由销售或领导手动新增客户。后续可以增加“一键转客户”按钮。
+## Convert an Inquiry to a Customer
 
-建议判断标准：
+A lead is ready to become a customer when it has:
 
-- 有明确设备、价格、交期、方案咨询。
-- 有有效联系方式。
-- 可以明确后续跟进负责人。
+- A clear equipment, price, delivery, or solution question
+- A usable contact method
+- A clear owner or next follow-up owner
 
-## 每次沟通后
+## After Every Contact
 
-进入客户详情，追加一条沟通记录：
+Open the customer detail page and add a follow-up log:
 
-- 沟通时间
-- 沟通方式
-- 摘要
-- 结果
-- 下次联系时间
+- Contact time
+- Channel
+- Summary
+- Result
+- Next action
+- Next follow-up time
 
-如果不填下次联系时间，系统会按客户级别自动算。
+If the next follow-up time is empty, the system can calculate a default based on customer level.
 
-## 每天查看提醒
+## Daily Reminder Review
 
-进入 `跟进提醒`：
+Use the reminder page to review:
 
-- 到期跟进：当天或已过期需要联系。
-- 公海释放提醒：超过 30 天未联系，即将进入公海。
-- 已进入公海：已经释放，需要领导重新分配。
+- Follow-ups due today or overdue
+- Public-pool release warnings
+- Customers already released to the public pool
+- Quoted customers that need follow-up
+- Payment reminders where contracts are not settled
 
-## 公海客户处理
+## Public Pool Handling
 
-公海客户不会删除。领导可以重新分配负责人，销售也可以在权限允许时领取。
+Public-pool customers are not deleted. They can be reassigned by leaders or claimed by sales users when permissions allow.
 
-## 不删除客户
+## Data Retention
 
-客户资料是公司资产。无效、重复、成交、暂缓都通过状态和标签处理，不删除记录。
+Customer records are company assets. Invalid, duplicate, closed-won, or paused customers should be handled through status, tags, recycle-bin workflow, or merge/archive actions instead of physical deletion.

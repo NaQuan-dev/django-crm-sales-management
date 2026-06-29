@@ -7,9 +7,9 @@ from django.utils.html import format_html
 
 from .models import Attachment, AuditLog, Contact, ContactLog, Contract, Customer, FeishuSyncRecord, FeishuSyncSource, Lead, OperationLog, Opportunity, Payment, Profile, Quote, QuoteItem, QuotePlan, Reminder, SampleTest, Tag, TaskReminder, VisitPlan, WorkOrderLink
 
-admin.site.site_header = "示例公司客户系统管理"
-admin.site.site_title = "示例公司客户系统管理"
-admin.site.index_title = "系统管理工作台"
+admin.site.site_header = "CRM Template Admin"
+admin.site.site_title = "CRM Template Admin"
+admin.site.index_title = "System Administration"
 admin.site.site_url = "/"
 
 

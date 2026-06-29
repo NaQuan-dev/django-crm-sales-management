@@ -1,62 +1,59 @@
-# 从飞书 CRM 迁移到 NAS CRM 的计划
+# Migration Plan Template
 
-## 阶段 1：先跑空系统
+> Template only. Do not import real customer data until credentials, backups, mappings, and access rules have been reviewed.
 
-目标：
+## Phase 1: Empty-System Trial
 
-- NAS 上 CRM 能打开。
-- 管理员账号可登录。
-- 销售账号和角色可创建。
-- 线索快录、客户新增、沟通记录、提醒规则能正常跑。
+Goals:
 
-不导入真实客户数据。
+- The CRM can start successfully.
+- Admin users can log in.
+- Sales users and roles can be created.
+- Customer creation, follow-up logs, reminders, and public-pool rules work on sample data.
 
-## 阶段 2：小范围试用
+Do not import real customer data in this phase.
 
-选择 1-2 名销售试用一周：
+## Phase 2: Small Pilot
 
-- 每天录入新线索。
-- 每次沟通后追加记录。
-- 检查下次联系时间是否符合销售习惯。
-- 检查公海提醒是否过严或过松。
+Pilot with 1-2 sales users for one week:
 
-## 阶段 3：导入历史数据
+- Add new inquiries manually.
+- Add a follow-up after every customer contact.
+- Check whether next-follow-up timing matches the team's workflow.
+- Check whether public-pool reminders are too strict or too loose.
 
-导入前先做三件事：
+## Phase 3: Historical Data Import
 
-1. 从飞书导出客户和线索备份。
-2. 在 NAS 上做数据库快照。
-3. 先导入 20 条样例验证字段映射。
+Before importing historical data:
 
-字段映射建议：
+1. Export a backup from the source system.
+2. Take a database snapshot of the target CRM.
+3. Import 20 sample rows first and verify mappings.
 
-| 飞书字段 | NAS CRM 字段 |
-|---|---|
-| 客户编号 | customer_no |
-| 客户名称 | name |
-| 联系人 | contact_name |
-| 联系电话 | phone |
-| 微信号 | wechat |
-| 邮箱 | email |
-| 地区 | region |
-| 线索来源 | source_channel |
-| 客户类型 | customer_type |
-| 客户需求 | demand |
-| 客户负责人 | owner |
-| 客户级别 | grade |
-| 客户状态 | status |
-| 最近跟进时间 | last_contact_at |
-| 下次联系时间 | next_contact_at |
+Suggested mapping:
 
-## 阶段 4：切换入口
+| Source field | CRM field |
+| --- | --- |
+| Customer ID | customer_no |
+| Customer name | name |
+| Contact person | contact_name |
+| Phone | phone |
+| WeChat | wechat |
+| Email | email |
+| Region | region |
+| Source channel | source_channel |
+| Customer type | customer_type |
+| Demand | demand |
+| Owner | owner |
+| Customer level | grade |
+| Customer status | status |
+| Last contact time | last_contact_at |
+| Next contact time | next_contact_at |
 
-飞书表格保留只读备份，新数据统一录入 NAS CRM。
+## Phase 4: Entry Switch
 
-## 阶段 5：接机器人
+Keep the old source system as a read-only backup. New work should be entered into the CRM after the migration is verified.
 
-第一版可用飞书群机器人提醒。稳定后再做：
+## Phase 5: Automation
 
-- 个人私聊提醒。
-- CRM助手对话式录入线索。
-- 语音转文字后自动生成沟通记录。
-- 本地 AI 自动标签和客户分级建议。
+After the CRM is stable, add integrations such as chat reminders, conversational intake, voice-to-text follow-up creation, local AI tags, and customer-level suggestions.

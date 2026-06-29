@@ -1,1 +1,4 @@
-Sanitized from internal NAS CRM on 2026-06-29T11:37:16. Production data, media, imports, logs, deployment keys, and .env files are excluded.
+PUBLIC TEMPLATE ONLY.
+Sanitized from an internal CRM codebase on 2026-06-29.
+Production data, media, imports, logs, deployment keys, real customer records, real staff identities, and .env files are excluded.
+Review all settings before deployment.
